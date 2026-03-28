@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { auth } from '../firebase/firebase.config'
+import { onAuthStateChanged } from 'firebase/auth'
 import BottomNav           from './components/shared/BottomNav'
 import LoginScreen         from './components/screens/LoginScreen'
 import DashboardScreen     from './components/screens/DashboardScreen'
@@ -14,14 +16,24 @@ import RoutesScreen        from './components/screens/RoutesScreen'
 import VisitsScreen        from './components/screens/VisitsScreen'
 import MoreScreen          from './components/screens/MoreScreen'
 import AdminScreen         from './components/screens/AdminScreen'
+import { C } from './constants/colors'
 
 const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [screen,   setScreen]   = useState('dashboard')
-  const [data,     setData]     = useState(null)
-  const [history,  setHistory]  = useState([])
+  const [loggedIn,  setLoggedIn]  = useState(false)
+  const [checking,  setChecking]  = useState(true)
+  const [screen,    setScreen]    = useState('dashboard')
+  const [data,      setData]      = useState(null)
+  const [history,   setHistory]   = useState([])
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setLoggedIn(!!user)
+      setChecking(false)
+    })
+    return unsub
+  }, [])
 
   const nav = (to, d = null) => {
     setHistory(h => [...h, { screen, data }])
@@ -51,11 +63,23 @@ export default function App() {
   }
 
   const handleLogout = () => {
+    auth.signOut()
     setLoggedIn(false)
     setScreen('dashboard')
     setHistory([])
     setData(null)
   }
+
+  if (checking) return (
+    <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 60, height: 60, borderRadius: 16, background: C.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <span style={{ fontSize: 28 }}>🐾</span>
+        </div>
+        <p style={{ color: C.gray400, fontSize: 14 }}>Cargando RutaPet...</p>
+      </div>
+    </div>
+  )
 
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
 
