@@ -1,7 +1,12 @@
 import { C } from '../../constants/colors'
 import { CLIENTES, VENTAS, VENTAS_MES, TOP_PRODUCTOS, PIE_CATEGORIAS } from '../../constants/data'
 import { fmtUSD, sumVentas, ticketPromedio } from '../../utils/helpers'
-import { AreaChart, Area, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import {
+  AreaChart, Area, LineChart, Line,
+  PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer
+} from 'recharts'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import KpiCard from '../shared/KpiCard'
