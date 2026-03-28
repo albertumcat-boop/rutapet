@@ -1,111 +1,164 @@
 import {
-  doc, getDoc, setDoc, collection, addDoc, serverTimestamp
+  collection, doc, addDoc, updateDoc, deleteDoc,
+  getDocs, getDoc, setDoc, query, where,
+  serverTimestamp
 } from 'firebase/firestore'
-import { db } from '../../firebase/firebase.config'
+import { db, auth } from '../../firebase/firebase.config'
 
-// ═══════════════════════════════════════════════════
-//  SETUP AUTOMÁTICO — se ejecuta la primera vez
-//  que un usuario entra a la app
-// ═══════════════════════════════════════════════════
+const uid    = ()        => auth.currentUser?.uid
+const col    = (name)    => collection(db, name)
+const docRef = (c, id)   => doc(db, c, id)
 
-export async function setupUsuarioNuevo(user) {
-  const uid = user.uid
+// ── USUARIO ───────────────────────────────────────────
+export const obtenerUsuario = async () => {
+  if (!uid()) return null
+  const snap = await getDoc(docRef('usuarios', uid()))
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null
+}
 
-  // ── 1. Verificar si ya existe el usuario ────────
-  const usuarioRef = doc(db, 'usuarios', uid)
-  const usuarioSnap = await getDoc(usuarioRef)
-
-  if (usuarioSnap.exists()) {
-    // Ya existe — no hacer nada
-    return { esNuevo: false, tenantId: usuarioSnap.data().tenantId }
-  }
-
-  // ── 2. Crear documento de usuario ───────────────
-  await setDoc(usuarioRef, {
-    uid,
-    email:     user.email || '',
-    nombre:    user.displayName || user.email?.split('@')[0] || 'Usuario',
-    rol:       'admin',
-    tenantId:  uid,
-    zona:      'Sin asignar',
-    activo:    true,
-    creadoEn:  serverTimestamp(),
+// ── CLIENTES ──────────────────────────────────────────
+export const agregarCliente = async (data) => {
+  return await addDoc(col('clientes'), {
+    ...data,
+    vendedorId:   uid(),
+    tenantId:     uid(),
+    activo:       true,
+    creadoEn:     serverTimestamp(),
+    ultimaVisita: serverTimestamp(),
   })
+}
 
-  // ── 3. Crear config del tenant ───────────────────
-  const configRef = doc(db, 'config', uid)
-  await setDoc(configRef, {
-    tenantId: uid,
-    onboardingCompleto: false,
-    empresa: {
-      nombre: '',
-      rubro:  '',
-      moneda: 'USD',
-      logo:   null,
-    },
-    tiposCliente:       [],
-    categoriasProducto: [],
+export const obtenerClientes = async () => {
+  const q    = query(col('clientes'),
+    where('vendedorId', '==', uid()),
+    where('activo', '==', true)
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export const actualizarCliente = async (id, data) => {
+  await updateDoc(docRef('clientes', id), {
+    ...data,
+    actualizadoEn: serverTimestamp(),
+  })
+}
+
+export const eliminarCliente = async (id) => {
+  await updateDoc(docRef('clientes', id), { activo: false })
+}
+
+// ── PRODUCTOS ─────────────────────────────────────────
+export const agregarProducto = async (data) => {
+  return await addDoc(col('productos'), {
+    ...data,
+    tenantId: uid(),
+    activo:   true,
     creadoEn: serverTimestamp(),
   })
+}
 
-  // ── 4. Crear productos de ejemplo ────────────────
-  const productosEjemplo = [
-    { nombre: 'Producto 1', categoria: 'cat1', marca: 'Marca A', precio: 10.00, stock: 50 },
-    { nombre: 'Producto 2', categoria: 'cat1', marca: 'Marca B', precio: 25.00, stock: 30 },
-    { nombre: 'Producto 3', categoria: 'cat2', marca: 'Marca A', precio: 15.00, stock: 80 },
-  ]
+export const obtenerProductos = async () => {
+  const q    = query(col('productos'),
+    where('tenantId', '==', uid()),
+    where('activo', '==', true)
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
 
-  for (const p of productosEjemplo) {
-    await addDoc(collection(db, 'productos'), {
-      ...p,
-      tenantId: uid,
-      activo:   true,
-      creadoEn: serverTimestamp(),
-    })
-  }
-
-  // ── 5. Crear cliente de ejemplo ──────────────────
-  const clienteRef = await addDoc(collection(db, 'clientes'), {
-    tenantId:     uid,
-    vendedorId:   uid,
-    nombre:       'Cliente de ejemplo',
-    tipo:         'tipo1',
-    contacto:     'Contacto principal',
-    telefono:     '+58 412-000-0000',
-    direccion:    'Dirección de ejemplo',
-    lat:          10.48,
-    lng:          -66.87,
-    nivel:        'medio',
-    deuda:        0,
-    notas:        'Este es un cliente de ejemplo. Puedes editarlo o eliminarlo.',
-    activo:       true,
-    ultimaVisita: serverTimestamp(),
-    creadoEn:     serverTimestamp(),
+export const actualizarProducto = async (id, data) => {
+  await updateDoc(docRef('productos', id), {
+    ...data,
+    actualizadoEn: serverTimestamp(),
   })
+}
 
-  // ── 6. Crear visita de ejemplo ───────────────────
-  await addDoc(collection(db, 'visitas'), {
-    tenantId:   uid,
-    vendedorId: uid,
-    clienteId:  clienteRef.id,
-    vendio:     true,
-    notas:      'Primera visita de ejemplo',
+// ── VENTAS ────────────────────────────────────────────
+export const agregarVenta = async (data) => {
+  const ref = await addDoc(col('ventas'), {
+    ...data,
+    vendedorId: uid(),
+    tenantId:   uid(),
     fecha:      serverTimestamp(),
     creadoEn:   serverTimestamp(),
   })
+  if (data.clienteId) {
+    await actualizarCliente(data.clienteId, {
+      ultimaVisita: serverTimestamp()
+    })
+  }
+  return ref
+}
 
-  // ── 7. Crear ruta de ejemplo ─────────────────────
-  await addDoc(collection(db, 'rutas'), {
-    tenantId:   uid,
-    vendedorId: uid,
-    nombre:     'Mi primera ruta',
-    fecha:      new Date().toISOString().split('T')[0],
-    estado:     'pendiente',
-    km:         0,
-    clientes:   [clienteRef.id],
+export const obtenerVentas = async () => {
+  const q    = query(col('ventas'), where('vendedorId', '==', uid()))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export const actualizarVenta = async (id, data) => {
+  await updateDoc(docRef('ventas', id), data)
+}
+
+// ── VISITAS ───────────────────────────────────────────
+export const agregarVisita = async (data) => {
+  const ref = await addDoc(col('visitas'), {
+    ...data,
+    vendedorId: uid(),
+    tenantId:   uid(),
+    fecha:      serverTimestamp(),
     creadoEn:   serverTimestamp(),
   })
+  if (data.clienteId) {
+    await actualizarCliente(data.clienteId, {
+      ultimaVisita: serverTimestamp()
+    })
+  }
+  return ref
+}
 
-  console.log('✅ Setup completado para:', uid)
-  return { esNuevo: true, tenantId: uid }
+export const obtenerVisitas = async () => {
+  const q    = query(col('visitas'), where('vendedorId', '==', uid()))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+// ── RUTAS ─────────────────────────────────────────────
+export const agregarRuta = async (data) => {
+  return await addDoc(col('rutas'), {
+    ...data,
+    vendedorId: uid(),
+    tenantId:   uid(),
+    creadoEn:   serverTimestamp(),
+  })
+}
+
+export const obtenerRutas = async () => {
+  const q    = query(col('rutas'), where('vendedorId', '==', uid()))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export const actualizarRuta = async (id, data) => {
+  await updateDoc(docRef('rutas', id), data)
+}
+
+export const eliminarRuta = async (id) => {
+  await deleteDoc(docRef('rutas', id))
+}
+
+// ── COBROS ────────────────────────────────────────────
+export const registrarPago = async (clienteId, montoPagado, deudaActual) => {
+  const nuevaDeuda = Math.max(0, deudaActual - montoPagado)
+  await actualizarCliente(clienteId, { deuda: nuevaDeuda })
+  await addDoc(col('pagos'), {
+    clienteId,
+    monto:      montoPagado,
+    vendedorId: uid(),
+    tenantId:   uid(),
+    fecha:      serverTimestamp(),
+    creadoEn:   serverTimestamp(),
+  })
+  return nuevaDeuda
 }
