@@ -89,16 +89,16 @@ export default function App() {
       case 'clients':      return <ClientsScreen      nav={nav} />
       case 'clientDetail': return <ClientDetailScreen cliente={data} onBack={goBack} nav={nav} />
       case 'addClient':    return <AddClientScreen    onBack={goBack} />
-      case 'map':          return <MapScreen          nav={nav} />
+      case 'map':          return <MapScreen          nav={nav} onBack={goBack} />
       case 'addSale':      return <AddSaleScreen      onBack={goBack} initCId={data?.clienteId} />
-      case 'products':     return <ProductsScreen />
-      case 'payments':     return <PaymentsScreen />
-      case 'analytics':    return <AnalyticsScreen />
-      case 'routes':       return <RoutesScreen />
-      case 'visits':       return <VisitsScreen nav={nav} />
-      case 'more':         return <MoreScreen   nav={nav} onLogout={handleLogout} />
-      case 'admin':        return <AdminScreen  onBack={goBack} />
-      default:             return <DashboardScreen nav={nav} />
+      case 'products':     return <ProductsScreen     onBack={goBack} />
+      case 'payments':     return <PaymentsScreen     onBack={goBack} />
+      case 'analytics':    return <AnalyticsScreen    onBack={goBack} />
+      case 'routes':       return <RoutesScreen       onBack={goBack} />
+      case 'visits':       return <VisitsScreen       nav={nav} onBack={goBack} />
+      case 'more':         return <MoreScreen         nav={nav} onLogout={handleLogout} />
+      case 'admin':        return <AdminScreen        onBack={goBack} />
+      default:             return <DashboardScreen    nav={nav} />
     }
   }
 
