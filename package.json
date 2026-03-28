@@ -1,7 +1,7 @@
 {
-  "name": "rutapet",
+  "name": "rutaventas",
   "version": "1.0.0",
-  "description": "RutaPet - Gestión de ventas en ruta para proveedores de mascotas",
+  "description": "RutaVentas - Gestión de ventas en ruta",
   "private": true,
   "scripts": {
     "dev": "vite",
