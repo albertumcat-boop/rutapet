@@ -7,11 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
-        name: 'RutaPet',
-        short_name: 'RutaPet',
-        description: 'Gestión de ventas en ruta para proveedores de mascotas',
+        name: 'RutaVentas',
+        short_name: 'RutaVentas',
+        description: 'Gestión de ventas en ruta para cualquier negocio',
         theme_color: '#0B1929',
         background_color: '#0B1929',
         display: 'standalone',
@@ -38,15 +38,7 @@ export default defineConfig({
           {
             name: 'Nueva venta',
             short_name: 'Venta',
-            description: 'Registrar una nueva venta',
-            url: '/?screen=addSale',
-            icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }]
-          },
-          {
-            name: 'Ver clientes',
-            short_name: 'Clientes',
-            description: 'Ver lista de clientes',
-            url: '/?screen=clients',
+            url: '/',
             icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }]
           }
         ]
@@ -59,7 +51,10 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'osm-tiles',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 7
+              }
             }
           },
           {
@@ -68,7 +63,7 @@ export default defineConfig({
             options: { cacheName: 'google-fonts' }
           },
           {
-            urlPattern: /^https:\/\/.*\.firebaseio\.com\/.*/i,
+            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
             handler: 'NetworkFirst',
             options: { cacheName: 'firebase-data' }
           }
