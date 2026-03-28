@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { C, nivelColor, nivelBg, nivelTxt, tipoColor, tipoIconName } from '../../constants/colors'
-import { CLIENTES } from '../../constants/data'
+import { useAppData } from '../../hooks/useAppData'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Badge from '../shared/Badge'
