@@ -5,27 +5,51 @@ import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Badge from '../shared/Badge'
 import Button from '../shared/Button'
+import TopBar from '../shared/TopBar'
 
-export default function RoutesScreen() {
-  const [open, setOpen] = useState(null)
+export default function RoutesScreen({ onBack }) {
+  const [open,      setOpen]      = useState(null)
+  const [showForm,  setShowForm]  = useState(false)
+  const [nombre,    setNombre]    = useState('')
+  const [fecha,     setFecha]     = useState(new Date().toISOString().split('T')[0])
+  const [selCls,    setSelCls]    = useState([])
+  const [guardado,  setGuardado]  = useState(false)
+
+  const toggleCliente = (id) =>
+    setSelCls(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+
+  const handleGuardar = () => {
+    if (!nombre || selCls.length === 0) return
+    setGuardado(true)
+    setTimeout(() => { setShowForm(false); setGuardado(false); setNombre(''); setSelCls([]) }, 1500)
+  }
 
   return (
-    <div className="screen-enter" style={{ background:C.gray50, minHeight:'100vh' }}>
-      <div style={{ background:C.navy, padding:'20px 14px 16px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h1 style={{ fontSize:20, fontWeight:900, color:'#fff', margin:0 }}>Rutas</h1>
-          <Button icon="plus" size="sm">Nueva ruta</Button>
-        </div>
-        <p style={{ fontSize:13, color:C.gray400, marginTop:6 }}>Planifica y optimiza tus visitas diarias</p>
+    <div className="screen-enter" style={{ background: C.gray50, minHeight: '100vh' }}>
+      <TopBar
+        title="Rutas"
+        onBack={onBack}
+        right={
+          <button onClick={() => setShowForm(true)}
+            style={{ background: C.teal, border: 'none', borderRadius: 10, padding: '6px 12px', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="plus" size={14} color="#fff" /> Nueva
+          </button>
+        }
+      />
+
+      <div style={{ background: C.navy, padding: '0 14px 16px' }}>
+        <p style={{ fontSize: 13, color: C.gray400, margin: 0 }}>Planifica y optimiza tus visitas diarias</p>
       </div>
-      <div style={{ padding:14 }}>
-        {RUTAS.map(r=>{
-          const isOpen=open===r.id
-          const cls=CLIENTES.filter(c=>r.clientes.includes(c.id))
-          const stBg=r.estado==='completada'?'#DCFCE7':'#FEF9C3'
-          const stTxt=r.estado==='completada'?'#166534':'#854D0E'
+
+      <div style={{ padding: 14 }}>
+        {RUTAS.map((r) => {
+          const isOpen  = open === r.id
+          const cls     = CLIENTES.filter(c => r.clientes.includes(c.id))
+          const stBg    = r.estado === 'completada' ? '#DCFCE7' : '#FEF9C3'
+          const stTxt   = r.estado === 'completada' ? '#166534' : '#854D0E'
+
           return (
-            <Card key={r.id} onClick={()=>setOpen(isOpen?null:r.id)}>
+            <Card key={r.id} onClick={() => setOpen(isOpen ? null : r.id)}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                 <div>
                   <p style={{ fontSize:15, fontWeight:700, color:C.gray800, margin:0 }}>{r.nombre}</p>
@@ -41,43 +65,107 @@ export default function RoutesScreen() {
                     </div>
                   </div>
                 </div>
-                <Badge bg={stBg} txt={stTxt}>{r.estado==='completada'?'✓ Completada':'Pendiente'}</Badge>
+                <Badge bg={stBg} txt={stTxt}>{r.estado === 'completada' ? '✓ Completada' : 'Pendiente'}</Badge>
               </div>
+
               {isOpen && (
                 <>
                   <div style={{ borderTop:`1px solid ${C.gray200}`, paddingTop:12, marginTop:12, marginBottom:12 }}>
                     <p style={{ fontSize:12, fontWeight:700, color:C.gray600, marginBottom:8 }}>Paradas en orden:</p>
-                    {cls.map((c,i)=>(
+                    {cls.map((c, i) => (
                       <div key={c.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
                         <div style={{ width:24, height:24, borderRadius:'50%', background:C.teal+'20', display:'flex', alignItems:'center', justifyContent:'center' }}>
                           <span style={{ fontSize:11, fontWeight:800, color:C.teal }}>{i+1}</span>
                         </div>
                         <div style={{ flex:1 }}>
                           <p style={{ fontSize:13, fontWeight:600, color:C.gray800, margin:0 }}>{c.nombre}</p>
-                          <p style={{ fontSize:11, color:C.gray400, margin:0 }}>{c.tipo}</p>
+                          <p style={{ fontSize:11, color:C.gray400, margin:0 }}>{c.tipo} · {c.direccion}</p>
                         </div>
                         <div style={{ width:8, height:8, borderRadius:'50%', background:nivelColor(c.nivel) }} />
                       </div>
                     ))}
                   </div>
                   <div style={{ display:'flex', gap:8 }}>
-                    <Button icon="nav" fullWidth onClick={e=>e.stopPropagation()}>Iniciar ruta</Button>
-                    <Button icon="map" variant="secondary" fullWidth onClick={e=>e.stopPropagation()}>Ver mapa</Button>
+                    <Button icon="nav" fullWidth onClick={(e) => {
+                      e.stopPropagation()
+                      const first = cls[0]
+                      if (first) window.open(`https://www.google.com/maps/dir/?api=1&destination=${first.lat},${first.lng}`, '_blank')
+                    }}>
+                      Iniciar en Maps
+                    </Button>
+                    <Button icon="map" variant="secondary" fullWidth onClick={(e) => e.stopPropagation()}>Ver mapa</Button>
                   </div>
                 </>
               )}
             </Card>
           )
         })}
+
         <div style={{ background:`linear-gradient(135deg,${C.navy},${C.navyLight})`, borderRadius:16, padding:'16px', border:`1px solid ${C.teal}30` }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
             <Icon name="zap" size={16} color={C.amber} />
             <span style={{ fontSize:13, fontWeight:700, color:C.amber }}>Próximamente — IA de rutas</span>
           </div>
-          <p style={{ fontSize:13, color:C.gray400, margin:0 }}>Optimización automática: mejores horarios, rutas más cortas y predicción de compra por cliente.</p>
+          <p style={{ fontSize:13, color:C.gray400, margin:0 }}>Optimización automática por cercanía y probabilidad de compra.</p>
         </div>
       </div>
-      <div style={{ height:90 }} />
+
+      {/* Modal nueva ruta */}
+      {showForm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:24, width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto' }}>
+            {guardado ? (
+              <div style={{ textAlign:'center', padding:'24px 0' }}>
+                <div style={{ width:64, height:64, borderRadius:'50%', background:'#DCFCE7', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px' }}>
+                  <Icon name="ok_circle" size={32} color={C.green} />
+                </div>
+                <h3 style={{ fontSize:18, fontWeight:800, color:C.gray800 }}>¡Ruta creada!</h3>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+                  <h3 style={{ fontSize:17, fontWeight:800, color:C.gray800, margin:0 }}>Nueva ruta</h3>
+                  <button onClick={() => setShowForm(false)} style={{ background:'none', border:'none', cursor:'pointer' }}>
+                    <Icon name="x_circle" size={22} color={C.gray400} />
+                  </button>
+                </div>
+
+                <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Nombre de la ruta *</label>
+                <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Ruta Norte — Lunes"
+                  style={{ width:'100%', padding:'11px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box', marginBottom:14 }} />
+
+                <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Fecha</label>
+                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                  style={{ width:'100%', padding:'11px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box', marginBottom:14 }} />
+
+                <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:8 }}>
+                  Selecciona clientes ({selCls.length} seleccionados)
+                </label>
+                {CLIENTES.map((c) => (
+                  <div key={c.id} onClick={() => toggleCliente(c.id)}
+                    style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, marginBottom:6, cursor:'pointer', background: selCls.includes(c.id) ? C.teal+'10' : C.gray50, border:`1.5px solid ${selCls.includes(c.id)?C.teal:C.gray200}` }}>
+                    <div style={{ width:20, height:20, borderRadius:6, border:`2px solid ${selCls.includes(c.id)?C.teal:C.gray300}`, background: selCls.includes(c.id)?C.teal:'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      {selCls.includes(c.id) && <Icon name="ok_circle" size={12} color="#fff" />}
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <p style={{ fontSize:13, fontWeight:700, color:C.gray800, margin:0 }}>{c.nombre}</p>
+                      <p style={{ fontSize:11, color:C.gray400, margin:0 }}>{c.tipo} · {c.direccion}</p>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ marginTop:16 }}>
+                  <Button icon="ok_circle" size="lg" fullWidth disabled={!nombre || selCls.length === 0} onClick={handleGuardar}>
+                    Crear ruta con {selCls.length} cliente{selCls.length !== 1 ? 's' : ''}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ height: 90 }} />
     </div>
   )
 }
