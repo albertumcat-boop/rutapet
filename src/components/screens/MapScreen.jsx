@@ -1,27 +1,48 @@
 import { useState, useEffect, useRef } from 'react'
-import { C, nivelColor, nivelBg, nivelTxt, tipoColor, tipoIconName } from '../../constants/colors'
+import { C, nivelColor } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
+import { useConfig } from '../../context/ConfigContext'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
-import Badge from '../shared/Badge'
 import Button from '../shared/Button'
 
 export default function MapScreen({ nav, onBack }) {
+  const { clientes } = useAppData()
+  const { config }   = useConfig()
+
   const [sel,         setSel]         = useState(null)
   const [filt,        setFilt]        = useState('todos')
-  const [mapReady,    setMapReady]     = useState(false)
   const [buscandoGPS, setBuscandoGPS] = useState(false)
-  const [cercanos,    setCercanos]     = useState([])
-  const mapRef        = useRef()
-  const mapInstanceRef= useRef()
-  const markersRef    = useRef([])
-  const miPinRef      = useRef()
+  const [cercanos,    setCercanos]    = useState([])
+  const [mapReady,    setMapReady]    = useState(false)
+  const mapRef         = useRef()
+  const mapInstanceRef = useRef()
+  const markersRef     = useRef([])
+  const miPinRef       = useRef()
 
-  const visible = CLIENTES.filter(c => filt === 'todos' || c.tipo === filt)
+  const visible = clientes.filter(c => filt === 'todos' || c.tipo === filt)
 
-  // ── Inicializar mapa ─────────────────────────────────
+  // ── Obtener color y letra del tipo desde config ──────
+  const getTipoColor = (key) => {
+    const t = config.tiposCliente.find(t => t.key === key)
+    return t?.color || '#94A3B8'
+  }
+  const getTipoLetra = (key) => {
+    const t = config.tiposCliente.find(t => t.key === key)
+    return t?.label?.charAt(0).toUpperCase() || '?'
+  }
+  const getTipoLabel = (key) => {
+    const t = config.tiposCliente.find(t => t.key === key)
+    return t?.label || key
+  }
+  const formatFecha = (fecha) => {
+    if (!fecha) return 'Sin registro'
+    if (fecha?.toDate) return fecha.toDate().toLocaleDateString('es-VE')
+    return fecha
+  }
+
+  // ── Inicializar mapa ──────────────────────────────────
   useEffect(() => {
-    let map
     const init = async () => {
       const leaflet = await import('leaflet')
       const L = leaflet.default
@@ -32,64 +53,64 @@ export default function MapScreen({ nav, onBack }) {
         shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
       if (!mapRef.current || mapInstanceRef.current) return
-      map = L.map(mapRef.current).setView([10.48, -66.87], 12)
+      const map = L.map(mapRef.current).setView([10.48, -66.87], 12)
       mapInstanceRef.current = map
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map)
-      agregarPines(L, map, 'todos')
       setMapReady(true)
     }
     init()
     return () => {
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+      }
     }
   }, [])
 
-  // ── Actualizar pines al cambiar filtro ───────────────
+  // ── Agregar/actualizar pines cuando cambian clientes o filtro ──
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || !mapReady) return
     import('leaflet').then(({ default: L }) => {
       markersRef.current.forEach(m => m.remove())
       markersRef.current = []
-      agregarPines(L, map, filt)
-    })
-  }, [filt, mapReady])
-
-  const agregarPines = (L, map, filtro) => {
-    const colores = { alto:'#22C55E', medio:'#EAB308', bajo:'#EF4444' }
-    const letras  = { veterinaria:'V', petshop:'P', agropecuaria:'A' }
-    CLIENTES.filter(c => filtro === 'todos' || c.tipo === filtro).forEach(c => {
-      const color = colores[c.nivel] || '#94A3B8'
-      const letra = letras[c.tipo]  || '?'
-      const icon  = L.divIcon({
-        className: '',
-        html: `<div style="width:36px;height:36px;border-radius:50%;background:${color};border:3px solid white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:white;box-shadow:0 3px 10px rgba(0,0,0,0.3);font-family:Nunito,sans-serif;cursor:pointer;">${letra}</div>`,
-        iconSize:[36,36], iconAnchor:[18,18], popupAnchor:[0,-20],
-      })
-      const marker = L.marker([c.lat, c.lng], { icon }).addTo(map)
-      marker.bindPopup(`
-        <div style="font-family:Nunito,sans-serif;min-width:200px;padding:4px;">
-          <p style="font-weight:800;font-size:15px;margin:0 0 4px;color:#1E293B;">${c.nombre}</p>
-          <p style="font-size:12px;color:#475569;margin:0 0 2px;">👤 ${c.contacto}</p>
-          <p style="font-size:12px;color:#475569;margin:0 0 8px;">📞 ${c.telefono}</p>
-          <p style="font-size:12px;color:#475569;margin:0 0 8px;">📍 ${c.direccion}</p>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <span style="background:${color}20;color:${color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">● Nivel ${c.nivel}</span>
-            <span style="background:#E0F2F1;color:#0F4C41;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">${c.tipo}</span>
+      const filtrados = clientes.filter(c => filt === 'todos' || c.tipo === filt)
+      filtrados.forEach(c => {
+        if (!c.lat || !c.lng) return
+        const color = nivelColor(c.nivel)
+        const letra = getTipoLetra(c.tipo)
+        const icon  = L.divIcon({
+          className: '',
+          html: `<div style="width:36px;height:36px;border-radius:50%;background:${color};border:3px solid white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:white;box-shadow:0 3px 10px rgba(0,0,0,0.3);font-family:Nunito,sans-serif;cursor:pointer;">${letra}</div>`,
+          iconSize:   [36, 36],
+          iconAnchor: [18, 18],
+          popupAnchor:[0, -20],
+        })
+        const marker = L.marker([c.lat, c.lng], { icon }).addTo(map)
+        marker.bindPopup(`
+          <div style="font-family:Nunito,sans-serif;min-width:200px;padding:4px;">
+            <p style="font-weight:800;font-size:15px;margin:0 0 4px;color:#1E293B;">${c.nombre}</p>
+            <p style="font-size:12px;color:#475569;margin:0 0 2px;">👤 ${c.contacto || ''}</p>
+            <p style="font-size:12px;color:#475569;margin:0 0 8px;">📞 ${c.telefono || ''}</p>
+            <p style="font-size:12px;color:#475569;margin:0 0 8px;">📍 ${c.direccion || ''}</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <span style="background:${color}20;color:${color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">● Nivel ${c.nivel || 'medio'}</span>
+              <span style="background:#E0F2F1;color:#0F4C41;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">${getTipoLabel(c.tipo)}</span>
+            </div>
+            ${c.deuda > 0
+              ? `<p style="margin:8px 0 0;font-size:12px;color:#EF4444;font-weight:700;">💳 Debe $${Number(c.deuda).toFixed(2)}</p>`
+              : `<p style="margin:8px 0 0;font-size:12px;color:#22C55E;font-weight:700;">✓ Sin deuda</p>`
+            }
+            <p style="font-size:11px;color:#94A3B8;margin:6px 0 0;">Última visita: ${formatFecha(c.ultimaVisita)}</p>
           </div>
-          ${c.deuda > 0
-            ? `<p style="margin:8px 0 0;font-size:12px;color:#EF4444;font-weight:700;">💳 Debe $${c.deuda.toFixed(2)}</p>`
-            : `<p style="margin:8px 0 0;font-size:12px;color:#22C55E;font-weight:700;">✓ Sin deuda</p>`
-          }
-          <p style="font-size:11px;color:#94A3B8;margin:6px 0 0;">Última visita: ${c.ultimaVisita}</p>
-        </div>
-      `, { maxWidth:250 })
-      markersRef.current.push(marker)
+        `, { maxWidth: 250 })
+        markersRef.current.push(marker)
+      })
     })
-  }
+  }, [clientes, filt, mapReady])
 
   // ── CERCANOS A MÍ ─────────────────────────────────────
   const handleCercanos = () => {
@@ -98,46 +119,39 @@ export default function MapScreen({ nav, onBack }) {
     setCercanos([])
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const myLat = pos.coords.latitude
         const myLng = pos.coords.longitude
         setBuscandoGPS(false)
 
-        // Calcular distancia con fórmula Haversine
         const distancia = (lat1, lng1, lat2, lng2) => {
-          const R   = 6371
+          const R    = 6371
           const dLat = (lat2 - lat1) * Math.PI / 180
           const dLng = (lng2 - lng1) * Math.PI / 180
-          const a   = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+          const a    = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
           return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
         }
 
-        // Ordenar clientes por distancia
-        const conDistancia = CLIENTES.map(c => ({
-          ...c,
-          distanciaKm: distancia(myLat, myLng, c.lat, c.lng)
-        })).sort((a, b) => a.distanciaKm - b.distanciaKm)
+        const conDistancia = clientes
+          .filter(c => c.lat && c.lng)
+          .map(c => ({ ...c, distanciaKm: distancia(myLat, myLng, c.lat, c.lng) }))
+          .sort((a, b) => a.distanciaKm - b.distanciaKm)
 
         setCercanos(conDistancia.slice(0, 5))
 
-        // Mover mapa a mi ubicación
         const map = mapInstanceRef.current
         if (map) {
           import('leaflet').then(({ default: L }) => {
-            // Quitar pin anterior si existe
             if (miPinRef.current) { miPinRef.current.remove(); miPinRef.current = null }
-
-            // Pin especial para "yo"
             const miIcon = L.divIcon({
               className: '',
               html: `<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 0 0 4px #3B82F640;"></div>`,
-              iconSize:[18,18], iconAnchor:[9,9],
+              iconSize: [18,18], iconAnchor: [9,9],
             })
             miPinRef.current = L.marker([myLat, myLng], { icon: miIcon })
               .addTo(map)
               .bindPopup('<b style="font-family:Nunito">📍 Tú estás aquí</b>')
               .openPopup()
-
             map.setView([myLat, myLng], 13)
           })
         }
@@ -145,7 +159,7 @@ export default function MapScreen({ nav, onBack }) {
       (err) => {
         setBuscandoGPS(false)
         const msgs = {
-          1: 'Permiso de ubicación denegado. Actívalo en el navegador.',
+          1: 'Permiso denegado. Actívalo en el navegador.',
           2: 'No se pudo obtener la ubicación.',
           3: 'Tiempo de espera agotado.',
         }
@@ -153,11 +167,6 @@ export default function MapScreen({ nav, onBack }) {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     )
-  }
-
-  // ── CREAR RUTA HOY ────────────────────────────────────
-  const handleCrearRuta = () => {
-    nav('routes')
   }
 
   return (
@@ -169,32 +178,40 @@ export default function MapScreen({ nav, onBack }) {
           <h1 style={{ fontSize:20, fontWeight:900, color:'#fff', margin:0 }}>Mapa de clientes</h1>
           <span style={{ fontSize:13, color:C.teal, fontWeight:700 }}>{visible.length} visibles</span>
         </div>
+
+        {/* Filtros dinámicos desde config */}
         <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2 }}>
-          {['todos','veterinaria','petshop','agropecuaria'].map(t => (
-            <button key={t} onClick={() => { setFilt(t); setSel(null) }}
-              style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:filt===t?C.teal:'#ffffff20', color:'#fff', border:'none', flexShrink:0 }}>
-              {t === 'todos' ? 'Todos' : t.charAt(0).toUpperCase() + t.slice(1)}
+          <button
+            onClick={() => { setFilt('todos'); setSel(null) }}
+            style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:filt==='todos'?C.teal:'#ffffff20', color:'#fff', border:'none', flexShrink:0 }}>
+            Todos
+          </button>
+          {config.tiposCliente.map(t => (
+            <button
+              key={t.key}
+              onClick={() => { setFilt(t.key); setSel(null) }}
+              style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:filt===t.key?t.color:'#ffffff20', color:'#fff', border:'none', flexShrink:0 }}>
+              {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Mapa */}
+      {/* Mapa Leaflet */}
       <div ref={mapRef} style={{ height:340, width:'100%', zIndex:1 }} />
 
       {/* Botones de acción */}
       <div style={{ padding:'14px 14px 0' }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
-
-          {/* Crear ruta hoy */}
-          <button onClick={handleCrearRuta}
+          <button
+            onClick={() => nav('routes')}
             style={{ padding:'12px', borderRadius:14, background:C.teal, border:'none', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontWeight:700, fontSize:14, color:'#fff' }}>
             <Icon name="route" size={18} color="#fff" />
             Crear ruta hoy
           </button>
-
-          {/* Cercanos a mí */}
-          <button onClick={handleCercanos} disabled={buscandoGPS}
+          <button
+            onClick={handleCercanos}
+            disabled={buscandoGPS}
             style={{ padding:'12px', borderRadius:14, background:'transparent', border:`1.5px solid ${C.teal}`, cursor:buscandoGPS?'not-allowed':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontWeight:700, fontSize:14, color:C.teal, opacity:buscandoGPS?0.7:1 }}>
             {buscandoGPS
               ? <><span style={{ width:16, height:16, border:`2px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />Buscando...</>
@@ -205,15 +222,14 @@ export default function MapScreen({ nav, onBack }) {
 
         {/* Leyenda */}
         <div style={{ display:'flex', gap:14, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
-          <span style={{ fontSize:12, color:C.green,  fontWeight:700 }}>● Alto</span>
-          <span style={{ fontSize:12, color:C.yellow, fontWeight:700 }}>● Medio</span>
-          <span style={{ fontSize:12, color:C.red,    fontWeight:700 }}>● Bajo</span>
-          <span style={{ fontSize:12, color:'#3B82F6',fontWeight:700 }}>● Tú</span>
-          <span style={{ fontSize:12, color:C.gray400 }}>· V=Vet P=Pet A=Agro</span>
+          <span style={{ fontSize:12, color:C.green,   fontWeight:700 }}>● Alto</span>
+          <span style={{ fontSize:12, color:C.yellow,  fontWeight:700 }}>● Medio</span>
+          <span style={{ fontSize:12, color:C.red,     fontWeight:700 }}>● Bajo</span>
+          <span style={{ fontSize:12, color:'#3B82F6', fontWeight:700 }}>● Tú</span>
         </div>
       </div>
 
-      {/* Lista de clientes cercanos */}
+      {/* Lista cercanos */}
       {cercanos.length > 0 && (
         <div style={{ padding:'0 14px' }}>
           <p style={{ fontSize:14, fontWeight:800, color:C.gray800, marginBottom:10 }}>
@@ -226,8 +242,12 @@ export default function MapScreen({ nav, onBack }) {
                   <span style={{ fontSize:14, fontWeight:800, color:C.teal }}>#{i+1}</span>
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <p style={{ fontSize:14, fontWeight:700, color:C.gray800, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.nombre}</p>
-                  <p style={{ fontSize:12, color:C.gray400, margin:'2px 0' }}>{c.tipo}</p>
+                  <p style={{ fontSize:14, fontWeight:700, color:C.gray800, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {c.nombre}
+                  </p>
+                  <p style={{ fontSize:12, color:C.gray400, margin:'2px 0' }}>
+                    {getTipoLabel(c.tipo)}
+                  </p>
                 </div>
                 <div style={{ textAlign:'right', flexShrink:0 }}>
                   <p style={{ fontSize:15, fontWeight:800, color:C.teal, margin:0 }}>
@@ -241,6 +261,19 @@ export default function MapScreen({ nav, onBack }) {
               </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Sin clientes */}
+      {clientes.length === 0 && (
+        <div style={{ padding:'30px 14px', textAlign:'center' }}>
+          <Icon name="map" size={36} color={C.gray400} />
+          <p style={{ fontSize:14, color:C.gray400, marginTop:10 }}>
+            Aún no tienes clientes en el mapa
+          </p>
+          <Button icon="plus" style={{ marginTop:12 }} onClick={() => nav('addClient')}>
+            Agregar cliente
+          </Button>
         </div>
       )}
 
