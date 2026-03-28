@@ -13,6 +13,7 @@ const MENU = [
   { icon:'route',    label:'Rutas',           sub:'Planificar visitas',      color:'#F5A623', screen:'routes'   },
   { icon:'calendar', label:'Visitas',         sub:'Historial de visitas',   color:'#3B82F6', screen:'visits'   },
   { icon:'settings', label:'Admin',           sub:'Panel de administrador', color:'#A78BFA', screen:'admin'    },
+  { icon:'activity', label:'Acerca de',       sub:'Info y versión de la app',color:'#94A3B8', screen:'about'   },
 ]
 
 export default function MoreScreen({ nav, onLogout }) {
