@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { auth } from '../firebase/firebase.config'
 import { onAuthStateChanged } from 'firebase/auth'
+import { useConfig } from './context/ConfigContext'
 import BottomNav           from './components/shared/BottomNav'
 import LoginScreen         from './components/screens/LoginScreen'
+import OnboardingScreen    from './components/screens/OnboardingScreen'
 import DashboardScreen     from './components/screens/DashboardScreen'
 import ClientsScreen       from './components/screens/ClientsScreen'
 import ClientDetailScreen  from './components/screens/ClientDetailScreen'
@@ -21,6 +23,7 @@ import { C } from './constants/colors'
 const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
 
 export default function App() {
+  const { config } = useConfig()
   const [loggedIn,  setLoggedIn]  = useState(false)
   const [checking,  setChecking]  = useState(true)
   const [screen,    setScreen]    = useState('dashboard')
@@ -70,18 +73,23 @@ export default function App() {
     setData(null)
   }
 
+  // Pantalla de carga
   if (checking) return (
     <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 60, height: 60, borderRadius: 16, background: C.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <span style={{ fontSize: 28 }}>🐾</span>
         </div>
-        <p style={{ color: C.gray400, fontSize: 14 }}>Cargando RutaPet...</p>
+        <p style={{ color: C.gray400, fontSize: 14 }}>Cargando...</p>
       </div>
     </div>
   )
 
+  // Login
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
+
+  // Onboarding — primera vez
+  if (!config.onboardingCompleto) return <OnboardingScreen />
 
   const renderScreen = () => {
     switch (screen) {
