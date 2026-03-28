@@ -1,8 +1,8 @@
-import Icon from './components/shared/Icon'
 import { useState, useEffect } from 'react'
 import { auth } from '../firebase/firebase.config'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useConfig } from './context/ConfigContext'
+import Icon from './components/shared/Icon'
 import BottomNav           from './components/shared/BottomNav'
 import LandingScreen       from './components/screens/LandingScreen'
 import LoginScreen         from './components/screens/LoginScreen'
@@ -27,18 +27,17 @@ const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
 
 export default function App() {
   const { config } = useConfig()
-  const [loggedIn,     setLoggedIn]     = useState(false)
-  const [checking,     setChecking]     = useState(true)
-  const [showLanding,  setShowLanding]  = useState(false)
-  const [screen,       setScreen]       = useState('dashboard')
-  const [data,         setData]         = useState(null)
-  const [history,      setHistory]      = useState([])
+  const [loggedIn,    setLoggedIn]    = useState(false)
+  const [checking,    setChecking]    = useState(true)
+  const [showLanding, setShowLanding] = useState(false)
+  const [screen,      setScreen]      = useState('dashboard')
+  const [data,        setData]        = useState(null)
+  const [history,     setHistory]     = useState([])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setLoggedIn(!!user)
       setChecking(false)
-      // Si no está logueado → mostrar landing
       if (!user) setShowLanding(true)
     })
     return unsub
@@ -80,31 +79,32 @@ export default function App() {
     setData(null)
   }
 
-  // Pantalla de carga
+  // ── Cargando ──────────────────────────────────────────
   if (checking) return (
-    <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 60, height: 60, borderRadius: 16, background: C.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+    <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
           <Icon name="route" size={30} color="#fff" />
         </div>
-        <p style={{ color: C.gray400, fontSize: 14 }}>Cargando...</p>
+        <p style={{ color:C.gray400, fontSize:14 }}>Cargando...</p>
       </div>
     </div>
   )
 
-  // Landing page — visitante no logueado
+  // ── Landing — visitante no logueado ───────────────────
   if (!loggedIn && showLanding) {
     return <LandingScreen onEntrar={() => setShowLanding(false)} />
   }
 
-  // Login / Registro
+  // ── Login / Registro ──────────────────────────────────
   if (!loggedIn) {
     return <LoginScreen onLogin={() => { setLoggedIn(true); setShowLanding(false) }} />
   }
 
-  // Onboarding — primera vez
+  // ── Onboarding — primera vez ──────────────────────────
   if (!config.onboardingCompleto) return <OnboardingScreen />
 
+  // ── App principal ─────────────────────────────────────
   const renderScreen = () => {
     switch (screen) {
       case 'dashboard':    return <DashboardScreen    nav={nav} />
@@ -126,7 +126,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', position: 'relative' }}>
+    <div style={{ maxWidth:480, margin:'0 auto', position:'relative' }}>
       {renderScreen()}
       {NAV_SCREENS.includes(screen) && (
         <BottomNav current={screen} onChange={tabChange} />
