@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { C, tipoColor, tipoIconName } from '../../constants/colors'
+import { useState, useRef, useEffect } from 'react'
+import { C, tipoColor } from '../../constants/colors'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Button from '../shared/Button'
@@ -11,7 +11,6 @@ const TIPOS = [
   { key:'agropecuaria', label:'Agropecuaria', icon:'leaf'     },
 ]
 
-// ── Comprime imagen al tamaño y calidad indicados ──────
 function comprimirImagen(file, maxWidth = 800, calidad = 0.7) {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -19,23 +18,11 @@ function comprimirImagen(file, maxWidth = 800, calidad = 0.7) {
       const img = new Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        let w = img.width
-        let h = img.height
-
-        // Escalar si es más ancha que maxWidth
-        if (w > maxWidth) {
-          h = Math.round((h * maxWidth) / w)
-          w = maxWidth
-        }
-
-        canvas.width  = w
-        canvas.height = h
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, w, h)
-
-        // Exportar como JPEG comprimido
-        const base64 = canvas.toDataURL('image/jpeg', calidad)
-        resolve(base64)
+        let w = img.width, h = img.height
+        if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', calidad))
       }
       img.src = e.target.result
     }
@@ -44,45 +31,147 @@ function comprimirImagen(file, maxWidth = 800, calidad = 0.7) {
 }
 
 export default function AddClientScreen({ onBack }) {
-  const [form,         setForm]        = useState({ nombre:'', tipo:'petshop', contacto:'', telefono:'', direccion:'', notas:'' })
-  const [foto,         setFoto]        = useState(null)
-  const [fotoSize,     setFotoSize]    = useState(null)
-  const [comprimiendo, setComprimiendo]= useState(false)
-  const [done,         setDone]        = useState(false)
-  const fileRef = useRef()
+  const [form,         setForm]         = useState({ nombre:'', tipo:'petshop', contacto:'', telefono:'', direccion:'', notas:'' })
+  const [foto,         setFoto]         = useState(null)
+  const [fotoSize,     setFotoSize]     = useState(null)
+  const [comprimiendo, setComprimiendo] = useState(false)
+  const [ubicacion,    setUbicacion]    = useState(null)   // { lat, lng }
+  const [buscandoGPS,  setBuscandoGPS]  = useState(false)
+  const [gpsError,     setGpsError]     = useState('')
+  const [mapListo,     setMapListo]     = useState(false)
+  const [done,         setDone]         = useState(false)
+  const fileRef  = useRef()
+  const mapRef   = useRef()
+  const mapInst  = useRef()
+  const markerRef= useRef()
 
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  // ── Foto ────────────────────────────────────────────
   const handleFoto = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     const originalKB = Math.round(file.size / 1024)
     setComprimiendo(true)
-
     try {
-      // Comprimir a máx 800px de ancho y 70% de calidad
       const base64 = await comprimirImagen(file, 800, 0.7)
-
-      // Calcular tamaño comprimido (base64 a KB aproximado)
       const comprimidoKB = Math.round((base64.length * 0.75) / 1024)
-
       setFoto(base64)
       setFotoSize({ original: originalKB, comprimido: comprimidoKB })
-    } catch (err) {
-      alert('Error al procesar la imagen')
-    } finally {
-      setComprimiendo(false)
-    }
+    } catch { alert('Error al procesar la imagen') }
+    finally { setComprimiendo(false) }
   }
 
-  const handleMapa = () => {
-    if (form.direccion) {
-      window.open(`https://www.google.com/maps/search/${encodeURIComponent(form.direccion + ', Caracas, Venezuela')}`, '_blank')
-    } else {
-      window.open('https://www.google.com/maps', '_blank')
+  // ── GPS: obtener ubicación actual ───────────────────
+  const usarMiUbicacion = () => {
+    if (!navigator.geolocation) {
+      setGpsError('Tu dispositivo no soporta GPS')
+      return
     }
+    setBuscandoGPS(true)
+    setGpsError('')
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setUbicacion({ lat, lng })
+
+        // Reverse geocoding con Nominatim (gratis)
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'Accept-Language': 'es' } }
+          )
+          const data = await res.json()
+          if (data.display_name) {
+            // Tomar solo la parte relevante de la dirección
+            const parts = data.display_name.split(',')
+            const direccionCorta = parts.slice(0, 3).join(',').trim()
+            upd('direccion', direccionCorta)
+          }
+        } catch { /* si falla el geocoding igual guardamos lat/lng */ }
+
+        setBuscandoGPS(false)
+        setMapListo(true)
+      },
+      (err) => {
+        setBuscandoGPS(false)
+        const msgs = {
+          1: 'Permiso de ubicación denegado. Actívalo en tu navegador.',
+          2: 'No se pudo obtener la ubicación.',
+          3: 'Tiempo de espera agotado.',
+        }
+        setGpsError(msgs[err.code] || 'Error de GPS')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
+
+  // ── Inicializar mini mapa Leaflet ───────────────────
+  useEffect(() => {
+    if (!mapListo || !ubicacion || !mapRef.current) return
+    if (mapInst.current) {
+      // Ya existe — solo mover el marcador
+      mapInst.current.setView([ubicacion.lat, ubicacion.lng], 16)
+      if (markerRef.current) markerRef.current.setLatLng([ubicacion.lat, ubicacion.lng])
+      return
+    }
+
+    import('leaflet').then(({ default: L }) => {
+      delete L.Icon.Default.prototype._getIconUrl
+      L.Icon.Default.mergeOptions({
+        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      })
+
+      const map = L.map(mapRef.current).setView([ubicacion.lat, ubicacion.lng], 16)
+      mapInst.current = map
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(map)
+
+      // Pin arrastrable — al moverlo actualiza lat/lng
+      const marker = L.marker([ubicacion.lat, ubicacion.lng], { draggable: true }).addTo(map)
+      markerRef.current = marker
+
+      marker.on('dragend', async (e) => {
+        const { lat, lng } = e.target.getLatLng()
+        setUbicacion({ lat, lng })
+
+        // Actualizar dirección al mover el pin
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'Accept-Language': 'es' } })
+          const data = await res.json()
+          if (data.display_name) {
+            const parts = data.display_name.split(',')
+            upd('direccion', parts.slice(0, 3).join(',').trim())
+          }
+        } catch {}
+      })
+
+      map.on('click', async (e) => {
+        const { lat, lng } = e.latlng
+        setUbicacion({ lat, lng })
+        marker.setLatLng([lat, lng])
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'Accept-Language': 'es' } })
+          const data = await res.json()
+          if (data.display_name) {
+            const parts = data.display_name.split(',')
+            upd('direccion', parts.slice(0, 3).join(',').trim())
+          }
+        } catch {}
+      })
+    })
+
+    return () => {
+      if (mapInst.current) { mapInst.current.remove(); mapInst.current = null }
+    }
+  }, [mapListo, ubicacion?.lat, ubicacion?.lng])
 
   if (done) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>
@@ -90,7 +179,7 @@ export default function AddClientScreen({ onBack }) {
         <Icon name="ok_circle" size={36} color={C.green} />
       </div>
       <h2 style={{ fontSize:20, fontWeight:800, color:C.gray800 }}>¡Cliente guardado!</h2>
-      <p style={{ color:C.gray400 }}>Redirigiendo...</p>
+      {ubicacion && <p style={{ fontSize:13, color:C.teal, fontWeight:700, marginTop:4 }}>📍 Ubicación guardada en el mapa</p>}
     </div>
   )
 
@@ -99,18 +188,9 @@ export default function AddClientScreen({ onBack }) {
       <TopBar title="Nuevo cliente" onBack={onBack} />
       <div style={{ padding:14 }}>
 
-        {/* Foto con compresión */}
+        {/* Foto */}
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:18 }}>
-          <div
-            onClick={() => fileRef.current.click()}
-            style={{
-              width:100, height:100, borderRadius:22,
-              background: foto ? 'transparent' : C.gray100,
-              display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-              cursor:'pointer', border:`2px dashed ${foto ? C.teal : C.gray200}`,
-              overflow:'hidden', position:'relative',
-            }}
-          >
+          <div onClick={() => fileRef.current.click()} style={{ width:100, height:100, borderRadius:22, background:foto?'transparent':C.gray100, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'pointer', border:`2px dashed ${foto?C.teal:C.gray200}`, overflow:'hidden', position:'relative' }}>
             {comprimiendo ? (
               <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
                 <span style={{ width:20, height:20, border:`2px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />
@@ -130,28 +210,18 @@ export default function AddClientScreen({ onBack }) {
               </>
             )}
           </div>
-
-          {/* Info de compresión */}
           {fotoSize && (
-            <div style={{ marginTop:8, background:'#DCFCE7', borderRadius:10, padding:'6px 14px', display:'flex', alignItems:'center', gap:8 }}>
-              <Icon name="ok_circle" size={14} color={C.green} />
+            <div style={{ marginTop:8, background:'#DCFCE7', borderRadius:10, padding:'6px 14px', display:'flex', alignItems:'center', gap:6 }}>
+              <Icon name="ok_circle" size={13} color={C.green} />
               <span style={{ fontSize:11, color:'#166534', fontWeight:700 }}>
-                Comprimida: {fotoSize.original} KB → {fotoSize.comprimido} KB
-                {' '}({Math.round((1 - fotoSize.comprimido / fotoSize.original) * 100)}% menos)
+                {fotoSize.original} KB → {fotoSize.comprimido} KB ({Math.round((1 - fotoSize.comprimido / fotoSize.original) * 100)}% menos)
               </span>
             </div>
           )}
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFoto}
-            style={{ display:'none' }}
-          />
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleFoto} style={{ display:'none' }} />
         </div>
 
-        {/* Tipo de negocio */}
+        {/* Tipo */}
         <Card>
           <p style={{ fontSize:13, fontWeight:700, color:C.gray600, marginBottom:10 }}>Tipo de negocio</p>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
@@ -165,60 +235,77 @@ export default function AddClientScreen({ onBack }) {
           </div>
         </Card>
 
-        {/* Campos de texto */}
+        {/* Campos */}
         {[
-          { key:'nombre',    label:'Nombre del negocio *', placeholder:'Ej: Veterinaria San Pedro' },
-          { key:'contacto',  label:'Contacto',              placeholder:'Ej: Dr. García'            },
-          { key:'telefono',  label:'Teléfono',              placeholder:'+58 412-XXX-XXXX'          },
-          { key:'direccion', label:'Dirección',             placeholder:'Av. Principal, Local 5...' },
+          { key:'nombre',   label:'Nombre del negocio *', placeholder:'Ej: Veterinaria San Pedro' },
+          { key:'contacto', label:'Contacto',              placeholder:'Ej: Dr. García'            },
+          { key:'telefono', label:'Teléfono',              placeholder:'+58 412-XXX-XXXX'          },
         ].map(f => (
           <div key={f.key} style={{ marginBottom:14 }}>
             <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>{f.label}</label>
-            <input
-              value={form[f.key]}
-              onChange={e => upd(f.key, e.target.value)}
-              placeholder={f.placeholder}
-              style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box' }}
-            />
+            <input value={form[f.key]} onChange={e => upd(f.key, e.target.value)} placeholder={f.placeholder}
+              style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box' }} />
           </div>
         ))}
 
-        {/* Notas */}
+        {/* Dirección + GPS */}
         <div style={{ marginBottom:14 }}>
-          <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Notas (opcional)</label>
-          <textarea
-            value={form.notas}
-            onChange={e => upd('notas', e.target.value)}
-            placeholder="Preferencias, observaciones..."
-            rows={3}
-            style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }}
-          />
+          <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Dirección</label>
+          <input value={form.direccion} onChange={e => upd('direccion', e.target.value)} placeholder="Se llena automáticamente con GPS..."
+            style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box', marginBottom:8 }} />
+
+          {/* Botón GPS */}
+          <button onClick={usarMiUbicacion} disabled={buscandoGPS}
+            style={{ width:'100%', padding:'11px', borderRadius:12, border:`1.5px solid ${C.teal}`, background:C.teal+'10', cursor:buscandoGPS?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:'inherit', fontWeight:700, fontSize:14, color:C.teal }}>
+            {buscandoGPS ? (
+              <>
+                <span style={{ width:16, height:16, border:`2px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />
+                Detectando ubicación...
+              </>
+            ) : (
+              <>
+                <Icon name="target" size={16} color={C.teal} />
+                {ubicacion ? '📍 Ubicación detectada — toca para actualizar' : 'Usar mi ubicación actual (GPS)'}
+              </>
+            )}
+          </button>
+
+          {gpsError && (
+            <p style={{ fontSize:12, color:C.red, marginTop:6, fontWeight:600 }}>⚠️ {gpsError}</p>
+          )}
         </div>
 
-        {/* Ubicación — abre Google Maps */}
-        <div style={{ marginBottom:18 }}>
-          <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Ubicación</label>
-          <div onClick={handleMapa}
-            style={{ height:100, background:'linear-gradient(135deg,#E3F2FD,#E8F5E9)', borderRadius:12, border:`1.5px solid ${C.gray200}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6, cursor:'pointer' }}>
-            <Icon name="map" size={28} color={C.teal} />
-            <span style={{ fontSize:13, color:C.teal, fontWeight:700 }}>
-              {form.direccion ? 'Ver en Google Maps ↗' : 'Abrir Google Maps ↗'}
-            </span>
-            <span style={{ fontSize:11, color:C.gray400 }}>Toca para verificar la dirección</span>
+        {/* Mini mapa */}
+        {mapListo && ubicacion && (
+          <div style={{ marginBottom:18 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <label style={{ fontSize:13, fontWeight:700, color:C.gray600 }}>Ubicación en el mapa</label>
+              <span style={{ fontSize:11, color:C.gray400 }}>Toca o arrastra el pin para ajustar</span>
+            </div>
+            <div ref={mapRef} style={{ height:220, borderRadius:14, overflow:'hidden', border:`1.5px solid ${C.teal}`, zIndex:1 }} />
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
+              <Icon name="ok_circle" size={14} color={C.green} />
+              <span style={{ fontSize:11, color:'#166534', fontWeight:700 }}>
+                Lat: {ubicacion.lat.toFixed(5)} · Lng: {ubicacion.lng.toFixed(5)}
+              </span>
+            </div>
           </div>
+        )}
+
+        {/* Notas */}
+        <div style={{ marginBottom:18 }}>
+          <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Notas (opcional)</label>
+          <textarea value={form.notas} onChange={e => upd('notas', e.target.value)} placeholder="Preferencias, observaciones..." rows={3}
+            style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }} />
         </div>
 
-        <Button
-          icon="ok_circle"
-          size="lg"
-          fullWidth
+        <Button icon="ok_circle" size="lg" fullWidth
           onClick={() => {
             if (!form.nombre) { alert('El nombre del negocio es obligatorio'); return }
             setDone(true)
-            setTimeout(onBack, 1400)
-          }}
-        >
-          Guardar cliente
+            setTimeout(onBack, 1600)
+          }}>
+          Guardar cliente {ubicacion ? '📍' : ''}
         </Button>
       </div>
       <div style={{ height:90 }} />
