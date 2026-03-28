@@ -3,6 +3,7 @@ import { auth } from '../firebase/firebase.config'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useConfig } from './context/ConfigContext'
 import BottomNav           from './components/shared/BottomNav'
+import LandingScreen       from './components/screens/LandingScreen'
 import LoginScreen         from './components/screens/LoginScreen'
 import OnboardingScreen    from './components/screens/OnboardingScreen'
 import DashboardScreen     from './components/screens/DashboardScreen'
@@ -18,23 +19,26 @@ import RoutesScreen        from './components/screens/RoutesScreen'
 import VisitsScreen        from './components/screens/VisitsScreen'
 import MoreScreen          from './components/screens/MoreScreen'
 import AdminScreen         from './components/screens/AdminScreen'
+import AboutScreen         from './components/screens/AboutScreen'
 import { C } from './constants/colors'
-import AboutScreen from './components/screens/AboutScreen'
 
 const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
 
 export default function App() {
   const { config } = useConfig()
-  const [loggedIn,  setLoggedIn]  = useState(false)
-  const [checking,  setChecking]  = useState(true)
-  const [screen,    setScreen]    = useState('dashboard')
-  const [data,      setData]      = useState(null)
-  const [history,   setHistory]   = useState([])
+  const [loggedIn,     setLoggedIn]     = useState(false)
+  const [checking,     setChecking]     = useState(true)
+  const [showLanding,  setShowLanding]  = useState(false)
+  const [screen,       setScreen]       = useState('dashboard')
+  const [data,         setData]         = useState(null)
+  const [history,      setHistory]      = useState([])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setLoggedIn(!!user)
       setChecking(false)
+      // Si no está logueado → mostrar landing
+      if (!user) setShowLanding(true)
     })
     return unsub
   }, [])
@@ -69,6 +73,7 @@ export default function App() {
   const handleLogout = () => {
     auth.signOut()
     setLoggedIn(false)
+    setShowLanding(true)
     setScreen('dashboard')
     setHistory([])
     setData(null)
@@ -79,15 +84,22 @@ export default function App() {
     <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 60, height: 60, borderRadius: 16, background: C.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <span style={{ fontSize: 28 }}>🐾</span>
+          <Icon name="route" size={30} color="#fff" />
         </div>
         <p style={{ color: C.gray400, fontSize: 14 }}>Cargando...</p>
       </div>
     </div>
   )
 
-  // Login
-  if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
+  // Landing page — visitante no logueado
+  if (!loggedIn && showLanding) {
+    return <LandingScreen onEntrar={() => setShowLanding(false)} />
+  }
+
+  // Login / Registro
+  if (!loggedIn) {
+    return <LoginScreen onLogin={() => { setLoggedIn(true); setShowLanding(false) }} />
+  }
 
   // Onboarding — primera vez
   if (!config.onboardingCompleto) return <OnboardingScreen />
@@ -107,7 +119,7 @@ export default function App() {
       case 'visits':       return <VisitsScreen       nav={nav} onBack={goBack} />
       case 'more':         return <MoreScreen         nav={nav} onLogout={handleLogout} />
       case 'admin':        return <AdminScreen        onBack={goBack} />
-      case 'about': return <AboutScreen onBack={goBack} />
+      case 'about':        return <AboutScreen        onBack={goBack} />
       default:             return <DashboardScreen    nav={nav} />
     }
   }
