@@ -122,7 +122,7 @@ export default function OnboardingScreen() {
           {/* Botón volver a la landing */}
           <div style={{ textAlign:'center', marginBottom:16 }}>
             <button
-              onClick={() => { auth.signOut(); window.location.reload() }}
+             onClick={async () => { await auth.signOut(); window.location.reload() }}
               style={{ background:'none', border:'none', fontSize:13, color:C.gray400, cursor:'pointer', fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}>
               ← Ver página de inicio
             </button>
