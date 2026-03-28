@@ -139,6 +139,18 @@ export default function OnboardingScreen() {
         </div>
 
         <div style={{ background: '#fff', borderRadius: 24, padding: '24px 20px' }}>
+          {/* Botón salir al inicio */}
+<div style={{ textAlign: 'center', marginBottom: 20 }}>
+  <button
+    onClick={() => {
+      auth.signOut()
+      window.location.reload()
+    }}
+    style={{ background: 'none', border: 'none', fontSize: 13, color: C.gray400, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+  >
+    ← Ver página de inicio
+  </button>
+</div>
           <Stepper />
 
           {/* ── PASO 1: Empresa ── */}
