@@ -19,6 +19,7 @@ import VisitsScreen        from './components/screens/VisitsScreen'
 import MoreScreen          from './components/screens/MoreScreen'
 import AdminScreen         from './components/screens/AdminScreen'
 import { C } from './constants/colors'
+import AboutScreen from './components/screens/AboutScreen'
 
 const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
 
@@ -106,6 +107,7 @@ export default function App() {
       case 'visits':       return <VisitsScreen       nav={nav} onBack={goBack} />
       case 'more':         return <MoreScreen         nav={nav} onLogout={handleLogout} />
       case 'admin':        return <AdminScreen        onBack={goBack} />
+      case 'about': return <AboutScreen onBack={goBack} />
       default:             return <DashboardScreen    nav={nav} />
     }
   }
