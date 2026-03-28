@@ -80,16 +80,16 @@ export default function App() {
   }
 
   // ── Cargando ──────────────────────────────────────────
-  if (checking) return (
-    <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-          <Icon name="route" size={30} color="#fff" />
-        </div>
-        <p style={{ color:C.gray400, fontSize:14 }}>Cargando...</p>
+  if (checking || loading) return (
+  <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ textAlign:'center' }}>
+      <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+        <Icon name="route" size={30} color="#fff" />
       </div>
+      <p style={{ color:C.gray400, fontSize:14 }}>Cargando...</p>
     </div>
-  )
+  </div>
+)
 
   // ── Landing — visitante no logueado ───────────────────
   if (!loggedIn && showLanding) {
