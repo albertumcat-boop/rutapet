@@ -1,3 +1,4 @@
+import Icon from './components/shared/Icon'
 import { useState, useEffect } from 'react'
 import { auth } from '../firebase/firebase.config'
 import { onAuthStateChanged } from 'firebase/auth'
