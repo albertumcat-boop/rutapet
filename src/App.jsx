@@ -26,7 +26,7 @@ import { C } from './constants/colors'
 const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
 
 export default function App() {
-  const { config } = useConfig()
+  const { config, loading } = useConfig()
   const [loggedIn,    setLoggedIn]    = useState(false)
   const [checking,    setChecking]    = useState(true)
   const [showLanding, setShowLanding] = useState(false)
@@ -79,32 +79,33 @@ export default function App() {
     setData(null)
   }
 
-  // ── Cargando ──────────────────────────────────────────
+  // ── Pantalla de carga (Firebase + Config) ─────────
   if (checking || loading) return (
-  <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
-    <div style={{ textAlign:'center' }}>
-      <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-        <Icon name="route" size={30} color="#fff" />
+    <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+          <Icon name="route" size={30} color="#fff" />
+        </div>
+        <div style={{ width:32, height:32, border:`3px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto 12px' }} />
+        <p style={{ color:C.gray400, fontSize:14 }}>Cargando...</p>
       </div>
-      <p style={{ color:C.gray400, fontSize:14 }}>Cargando...</p>
     </div>
-  </div>
-)
+  )
 
-  // ── Landing — visitante no logueado ───────────────────
+  // ── Landing — visitante no logueado ───────────────
   if (!loggedIn && showLanding) {
     return <LandingScreen onEntrar={() => setShowLanding(false)} />
   }
 
-  // ── Login / Registro ──────────────────────────────────
+  // ── Login / Registro ──────────────────────────────
   if (!loggedIn) {
     return <LoginScreen onLogin={() => { setLoggedIn(true); setShowLanding(false) }} />
   }
 
-  // ── Onboarding — primera vez ──────────────────────────
+  // ── Onboarding — primera vez ──────────────────────
   if (!config.onboardingCompleto) return <OnboardingScreen />
 
-  // ── App principal ─────────────────────────────────────
+  // ── App principal ─────────────────────────────────
   const renderScreen = () => {
     switch (screen) {
       case 'dashboard':    return <DashboardScreen    nav={nav} />
