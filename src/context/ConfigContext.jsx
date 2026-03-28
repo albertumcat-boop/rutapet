@@ -1,65 +1,95 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { auth } from '../../firebase/firebase.config'
+import { onAuthStateChanged } from 'firebase/auth'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '../../firebase/firebase.config'
+import { setupUsuarioNuevo } from '../services/setupFirestore'
 
-// ── Config por defecto (se reemplaza en el onboarding) ──
 const DEFAULT_CONFIG = {
-  empresa: {
-    nombre:  'Mi Empresa',
-    rubro:   'Ventas en ruta',
-    logo:    null,
-    moneda:  'USD',
-  },
-  tiposCliente: [
-    { key: 't1', label: 'Tipo 1', icon: 'users',    color: '#3B82F6' },
-    { key: 't2', label: 'Tipo 2', icon: 'shopping', color: '#0FBCAA' },
-    { key: 't3', label: 'Tipo 3', icon: 'pkg',      color: '#22C55E' },
-  ],
-  categoriasProducto: [
-    { key: 'c1', label: 'Categoría 1', icon: 'pkg',      color: '#22C55E' },
-    { key: 'c2', label: 'Categoría 2', icon: 'pill',     color: '#EF4444' },
-    { key: 'c3', label: 'Categoría 3', icon: 'shopping', color: '#A78BFA' },
-  ],
+  empresa: { nombre: '', rubro: '', logo: null, moneda: 'USD' },
+  tiposCliente:       [],
+  categoriasProducto: [],
   onboardingCompleto: false,
 }
 
 const ConfigContext = createContext(null)
 
 export function ConfigProvider({ children }) {
-  const [config, setConfig] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rutapet_config')
-      return saved ? JSON.parse(saved) : DEFAULT_CONFIG
-    } catch {
-      return DEFAULT_CONFIG
-    }
-  })
+  const [config,   setConfig]   = useState(DEFAULT_CONFIG)
+  const [tenantId, setTenantId] = useState(null)
+  const [loading,  setLoading]  = useState(true)
 
-  // Guardar en localStorage cada vez que cambia
   useEffect(() => {
-    localStorage.setItem('rutapet_config', JSON.stringify(config))
-  }, [config])
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setConfig(DEFAULT_CONFIG)
+        setTenantId(null)
+        setLoading(false)
+        return
+      }
 
-  const updateConfig = (partial) => {
-    setConfig(prev => ({ ...prev, ...partial }))
-  }
+      try {
+        // Setup automático si es nuevo usuario
+        const { tenantId: tid } = await setupUsuarioNuevo(user)
+        setTenantId(tid)
 
-  const updateEmpresa = (partial) => {
-    setConfig(prev => ({ ...prev, empresa: { ...prev.empresa, ...partial } }))
-  }
-
-  const completarOnboarding = (data) => {
-    setConfig({
-      ...data,
-      onboardingCompleto: true,
+        // Cargar config desde Firestore
+        const configSnap = await getDoc(doc(db, 'config', tid))
+        if (configSnap.exists()) {
+          const data = configSnap.data()
+          setConfig({
+            empresa:            data.empresa            || DEFAULT_CONFIG.empresa,
+            tiposCliente:       data.tiposCliente       || [],
+            categoriasProducto: data.categoriasProducto || [],
+            onboardingCompleto: data.onboardingCompleto || false,
+          })
+        } else {
+          setConfig(DEFAULT_CONFIG)
+        }
+      } catch (err) {
+        console.error('Error en ConfigContext:', err)
+        setConfig(DEFAULT_CONFIG)
+      } finally {
+        setLoading(false)
+      }
     })
+    return unsub
+  }, [])
+
+  // Guardar config completa en Firestore
+  const guardarConfigFirestore = async (newConfig, tid) => {
+    const id = tid || tenantId
+    if (!id) return
+    await setDoc(doc(db, 'config', id), {
+      ...newConfig,
+      tenantId:      id,
+      actualizadoEn: serverTimestamp(),
+    }, { merge: true })
   }
 
-  const resetConfig = () => {
-    setConfig({ ...DEFAULT_CONFIG, onboardingCompleto: false })
-    localStorage.removeItem('rutapet_config')
+  const completarOnboarding = async (data) => {
+    const newConfig = { ...data, onboardingCompleto: true }
+    setConfig(newConfig)
+    await guardarConfigFirestore(newConfig)
+  }
+
+  const updateEmpresa = async (partial) => {
+    const newConfig = { ...config, empresa: { ...config.empresa, ...partial } }
+    setConfig(newConfig)
+    await guardarConfigFirestore(newConfig)
+  }
+
+  const resetConfig = async () => {
+    const empty = { ...DEFAULT_CONFIG, onboardingCompleto: false }
+    setConfig(empty)
+    await guardarConfigFirestore(empty)
   }
 
   return (
-    <ConfigContext.Provider value={{ config, updateConfig, updateEmpresa, completarOnboarding, resetConfig }}>
+    <ConfigContext.Provider value={{
+      config, tenantId, loading,
+      completarOnboarding, updateEmpresa, resetConfig,
+    }}>
       {children}
     </ConfigContext.Provider>
   )
