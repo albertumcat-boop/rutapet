@@ -24,18 +24,17 @@ body {
 
 input, select, textarea, button {
   font-family: 'Nunito', sans-serif;
+  max-width: 100%;
 }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
 }
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 
-/* ── Animaciones ── */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
@@ -48,20 +47,19 @@ input:focus, select:focus, textarea:focus {
   animation: fadeIn 0.22s ease-out both;
 }
 
-/* ── Fix texto que se monta ── */
-p, span, h1, h2, h3, h4, label, button {
+/* ── Fix global texto ── */
+* {
   word-break: break-word;
   overflow-wrap: break-word;
+  min-width: 0;
 }
 
-/* ── Fix imágenes ── */
 img {
   max-width: 100%;
   height: auto;
   display: block;
 }
 
-/* ── Fix select iOS ── */
 select {
   -webkit-appearance: none;
   appearance: none;
@@ -71,12 +69,62 @@ select {
   padding-right: 36px !important;
 }
 
-/* ── Fix Leaflet ── */
 .leaflet-container {
   font-family: 'Nunito', sans-serif !important;
 }
 
-/* ── Safe area iPhone ── */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+/* ── Planes landing: 1 col móvil, 3 col desktop ── */
+.planes-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 700px) {
+  .planes-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── Features landing: 1 col móvil, 2 col desktop ── */
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 600px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Pasos landing: 1 col móvil, 3 col desktop ── */
+.pasos-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (min-width: 600px) {
+  .pasos-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── Rubros: 4 col siempre pero más chico en móvil ── */
+.rubros-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 400px) {
+  .rubros-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── KPIs app: siempre 2 col ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
 }
