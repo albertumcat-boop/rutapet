@@ -54,27 +54,23 @@ export default function LandingScreen({ onEntrar }) {
     <div style={{ fontFamily:'Nunito, sans-serif', background:'#fff', overflowX:'hidden' }}>
 
       {/* ── NAVBAR ── */}
-      <nav style={{ position:'sticky', top:0, zIndex:100, background:C.navy, borderBottom:'1px solid #ffffff10' }}>
-        <div style={{ maxWidth:1000, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-            <div style={{ width:30, height:30, borderRadius:8, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Icon name="route" size={16} color="#fff" />
-            </div>
-            <span style={{ fontSize:17, fontWeight:900, color:'#fff' }}>RutaVentas</span>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <button onClick={() => scrollTo('precios')}
-              style={{ background:'none', border:'none', color:C.gray400, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-              Precios
-            </button>
-            <button onClick={onEntrar}
-              style={{ background:C.teal, border:'none', borderRadius:10, padding:'8px 14px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
-              Entrar →
-            </button>
-          </div>
-        </div>
-      </nav>
+<nav style={{ position:'sticky', top:0, zIndex:100, background:C.navy, borderBottom:'1px solid #ffffff10' }}>
+  <div style={{ maxWidth:1000, margin:'0 auto', padding:'0 14px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52 }}>
+    {/* Logo */}
+    <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+      <div style={{ width:28, height:28, borderRadius:7, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <Icon name="route" size={15} color="#fff" />
+      </div>
+      <span style={{ fontSize:16, fontWeight:900, color:'#fff', whiteSpace:'nowrap' }}>RutaVentas</span>
+    </div>
 
+    {/* Botón entrar — siempre visible */}
+    <button onClick={onEntrar}
+      style={{ background:C.teal, border:'none', borderRadius:10, padding:'8px 14px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', flexShrink:0 }}>
+      Entrar →
+    </button>
+  </div>
+</nav>
       {/* ── HERO ── */}
       <section style={{ background:`linear-gradient(160deg,${C.navy},${C.navyLight})`, padding:'60px 20px 50px', textAlign:'center' }}>
         <div style={{ maxWidth:580, margin:'0 auto' }}>
@@ -176,57 +172,59 @@ export default function LandingScreen({ onEntrar }) {
       </section>
 
       {/* ── PRECIOS ── */}
-      <section id="precios" style={{ background:'#F8FAFC', padding:'44px 20px' }}>
-        <div style={{ maxWidth:900, margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:28 }}>
-            <p style={{ fontSize:11, fontWeight:800, color:C.teal, letterSpacing:1, textTransform:'uppercase', marginBottom:8 }}>Precios</p>
-            <h2 style={{ fontSize:'clamp(20px,5vw,28px)', fontWeight:900, color:C.gray800, margin:'0 0 10px' }}>Planes para cada etapa</h2>
-            <p style={{ fontSize:14, color:C.gray600 }}>Empieza gratis. Crece cuando estés listo.</p>
+<section id="precios" style={{ background:'#F8FAFC', padding:'44px 16px' }}>
+  <div style={{ maxWidth:900, margin:'0 auto' }}>
+    <div style={{ textAlign:'center', marginBottom:28 }}>
+      <p style={{ fontSize:11, fontWeight:800, color:C.teal, letterSpacing:1, textTransform:'uppercase', marginBottom:8 }}>Precios</p>
+      <h2 style={{ fontSize:'clamp(20px,5vw,28px)', fontWeight:900, color:C.gray800, margin:'0 0 10px' }}>Planes para cada etapa</h2>
+      <p style={{ fontSize:14, color:C.gray600 }}>Empieza gratis. Crece cuando estés listo.</p>
+    </div>
+
+    {/* En móvil: uno abajo del otro. En desktop: 3 columnas */}
+    <div className="planes-grid">
+      {PLANES.map(p => (
+        <div key={p.nombre} style={{
+          background: p.destacado ? C.navy : '#fff',
+          borderRadius: 20,
+          padding: '24px 18px',
+          border: p.destacado ? `2px solid ${C.teal}` : '1px solid #E2E8F0',
+          boxShadow: p.destacado ? `0 8px 32px ${C.teal}25` : 'none',
+          position: 'relative',
+        }}>
+          {p.destacado && (
+            <div style={{ position:'absolute', top:-13, left:'50%', transform:'translateX(-50%)', background:C.teal, borderRadius:20, padding:'3px 14px', whiteSpace:'nowrap' }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>⭐ Más popular</span>
+            </div>
+          )}
+
+          {/* Precio y nombre */}
+          <p style={{ fontSize:15, fontWeight:800, color:p.destacado?'#fff':C.gray800, margin:'0 0 6px' }}>{p.nombre}</p>
+          <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:14 }}>
+            <span style={{ fontSize:30, fontWeight:900, color:p.destacado?C.teal:C.gray800 }}>{p.precio}</span>
+            <span style={{ fontSize:12, color:C.gray400 }}>/{p.periodo}</span>
           </div>
+          <button onClick={onEntrar}
+            style={{ width:'100%', padding:'10px', borderRadius:12, border:`1.5px solid ${p.destacado?C.teal:'#E2E8F0'}`, background:p.destacado?C.teal:'transparent', color:p.destacado?'#fff':C.gray800, fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit', marginBottom:16 }}>
+            {p.cta}
+          </button>
 
-          {/* Usa clase CSS para cambiar a 3 col en desktop */}
-          <div className="planes-grid">
-            {PLANES.map(p => (
-              <div key={p.nombre} style={{
-                background: p.destacado ? C.navy : '#fff',
-                borderRadius: 20,
-                padding: '24px 20px',
-                border: p.destacado ? `2px solid ${C.teal}` : '1px solid #E2E8F0',
-                boxShadow: p.destacado ? `0 8px 32px ${C.teal}25` : 'none',
-                position: 'relative',
-              }}>
-                {p.destacado && (
-                  <div style={{ position:'absolute', top:-13, left:'50%', transform:'translateX(-50%)', background:C.teal, borderRadius:20, padding:'3px 14px', whiteSpace:'nowrap' }}>
-                    <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>⭐ Más popular</span>
-                  </div>
-                )}
-
-                <div style={{ marginBottom:16 }}>
-                  <p style={{ fontSize:15, fontWeight:800, color:p.destacado?'#fff':C.gray800, margin:'0 0 6px' }}>{p.nombre}</p>
-                  <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:14 }}>
-                    <span style={{ fontSize:30, fontWeight:900, color:p.destacado?C.teal:C.gray800 }}>{p.precio}</span>
-                    <span style={{ fontSize:12, color:C.gray400 }}>/{p.periodo}</span>
-                  </div>
-                  <button onClick={onEntrar}
-                    style={{ width:'100%', padding:'10px', borderRadius:12, border:`1.5px solid ${p.destacado?C.teal:'#E2E8F0'}`, background:p.destacado?C.teal:'transparent', color:p.destacado?'#fff':C.gray800, fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>
-                    {p.cta}
-                  </button>
-                </div>
-
-                <div style={{ borderTop:`1px solid ${p.destacado?'#ffffff15':'#E2E8F0'}`, paddingTop:14 }}>
-                  {p.features.map(f => (
-                    <div key={f} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8 }}>
-                      <Icon name="ok_circle" size={14} color={p.destacado?C.teal:C.green} style={{ flexShrink:0, marginTop:2 }} />
-                      <span style={{ fontSize:13, color:p.destacado?C.gray400:C.gray600, lineHeight:1.4 }}>{f}</span>
-                    </div>
-                  ))}
-                </div>
+          {/* Features */}
+          <div style={{ borderTop:`1px solid ${p.destacado?'#ffffff15':'#E2E8F0'}`, paddingTop:14 }}>
+            {p.features.map(f => (
+              <div key={f} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8 }}>
+                <Icon name="ok_circle" size={14} color={p.destacado?C.teal:C.green} style={{ flexShrink:0, marginTop:1 }} />
+                <span style={{ fontSize:13, color:p.destacado?C.gray400:C.gray600, lineHeight:1.4 }}>{f}</span>
               </div>
             ))}
           </div>
-          <p style={{ textAlign:'center', fontSize:12, color:C.gray400, marginTop:18 }}>Stripe · Zelle · Zinli · Pago Móvil · PayPal</p>
         </div>
-      </section>
+      ))}
+    </div>
+    <p style={{ textAlign:'center', fontSize:12, color:C.gray400, marginTop:18 }}>
+      Zelle · Pago Móvil · Transferencia
+    </p>
+  </div>
+</section>
 
       {/* ── CTA FINAL ── */}
       <section style={{ background:`linear-gradient(135deg,${C.navy},${C.navyLight})`, padding:'56px 20px', textAlign:'center' }}>
