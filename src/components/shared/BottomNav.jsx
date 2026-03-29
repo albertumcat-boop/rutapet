@@ -11,11 +11,17 @@ const TABS = [
 
 export default function BottomNav({ current, onChange }) {
   return (
-    <div style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0,
-      background: '#fff', borderTop: `1px solid ${C.gray200}`,
-      display: 'flex', zIndex: 100,
-    }}>
+   <div
+  style={{
+    position: 'fixed',
+    bottom: 0, left: 0, right: 0,
+    background: '#fff',
+    borderTop: `1px solid ${C.gray200}`,
+    display: 'flex',
+    zIndex: 100,
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  }}
+>
       {TABS.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
           style={{
