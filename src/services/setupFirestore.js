@@ -48,7 +48,7 @@ export async function setupUsuarioNuevo(user) {
     tenantId:     uid,
     vendedorId:   uid,
     nombre:       'Cliente de ejemplo',
-    tipo:         'tipo1',
+    tipo:         '',
     contacto:     'Contacto principal',
     telefono:     '+58 412-000-0000',
     direccion:    'Dirección de ejemplo',
