@@ -53,22 +53,30 @@ export default function LandingScreen({ onEntrar }) {
   return (
     <div style={{ fontFamily:'Nunito, sans-serif', background:'#fff', overflowX:'hidden' }}>
 
-      {/* ── NAVBAR ── */}
+     {/* ── NAVBAR ── */}
 <nav style={{ position:'sticky', top:0, zIndex:100, background:C.navy, borderBottom:'1px solid #ffffff10' }}>
   <div style={{ maxWidth:1000, margin:'0 auto', padding:'0 14px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52 }}>
-    {/* Logo */}
     <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-      <div style={{ width:28, height:28, borderRadius:7, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+      <div style={{ width:28, height:28, borderRadius:7, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center' }}>
         <Icon name="route" size={15} color="#fff" />
       </div>
       <span style={{ fontSize:16, fontWeight:900, color:'#fff', whiteSpace:'nowrap' }}>RutaVentas</span>
     </div>
 
-    {/* Botón entrar — siempre visible */}
-    <button onClick={onEntrar}
-      style={{ background:C.teal, border:'none', borderRadius:10, padding:'8px 14px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', flexShrink:0 }}>
-      Entrar →
-    </button>
+    {/* Solo mostrar en desktop — en móvil el hero ya tiene el botón */}
+    <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+      <button onClick={() => scrollTo('precios')}
+        style={{ background:'none', border:'none', color:C.gray400, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+        Precios
+      </button>
+      <button onClick={onEntrar}
+        style={{ background:C.teal, border:'none', borderRadius:10, padding:'7px 14px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+          // Ocultar en móvil con CSS inline — el hero ya tiene el botón
+          display:'var(--nav-btn-display, flex)'
+        }}>
+        Entrar →
+      </button>
+    </div>
   </div>
 </nav>
       {/* ── HERO ── */}
