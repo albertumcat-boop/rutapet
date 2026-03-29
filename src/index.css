@@ -1,3 +1,5 @@
+@import 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -46,7 +48,6 @@ input:focus, select:focus, textarea:focus {
   animation: fadeIn 0.22s ease-out both;
 }
 
-/* ── Fix texto — NO aplicar a todo con * ── */
 p, h1, h2, h3, h4, h5, span, label, button {
   word-break: break-word;
   overflow-wrap: break-word;
@@ -67,14 +68,9 @@ select {
   padding-right: 36px !important;
 }
 
-/* ── Leaflet — NO tocar ── */
+/* ── Leaflet ── */
 .leaflet-container {
   font-family: 'Nunito', sans-serif !important;
-}
-.leaflet-tile-container,
-.leaflet-tile {
-  width: 256px !important;
-  height: 256px !important;
 }
 
 /* ── Safe area iPhone ── */
@@ -126,7 +122,6 @@ select {
   margin-bottom: 10px;
 }
 
-/* Ocultar botón nav en móvil */
 @media (max-width: 480px) {
   :root { --nav-btn-display: none; }
 }
