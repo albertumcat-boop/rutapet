@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { C } from '../../constants/colors'
 import { useConfig } from '../../context/ConfigContext'
+import { agregarCliente } from '../../services/firestore'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Button from '../shared/Button'
@@ -27,9 +28,11 @@ function comprimirImagen(file, maxWidth = 800, calidad = 0.7) {
 
 export default function AddClientScreen({ onBack }) {
   const { config } = useConfig()
-  const TIPOS = config.tiposCliente
+  const TIPOS = config.tiposCliente || []
 
-  const [form,         setForm]         = useState({ nombre:'', tipo: TIPOS[0]?.key || '', contacto:'', telefono:'', direccion:'', notas:'' })
+  const [form, setForm] = useState({
+    nombre:'', tipo:'', contacto:'', telefono:'', direccion:'', notas:''
+  })
   const [foto,         setFoto]         = useState(null)
   const [fotoSize,     setFotoSize]     = useState(null)
   const [comprimiendo, setComprimiendo] = useState(false)
@@ -37,11 +40,19 @@ export default function AddClientScreen({ onBack }) {
   const [buscandoGPS,  setBuscandoGPS]  = useState(false)
   const [gpsError,     setGpsError]     = useState('')
   const [mapListo,     setMapListo]     = useState(false)
+  const [saving,       setSaving]       = useState(false)
   const [done,         setDone]         = useState(false)
-  const fileRef  = useRef()
-  const mapRef   = useRef()
-  const mapInst  = useRef()
-  const markerRef= useRef()
+  const fileRef   = useRef()
+  const mapRef    = useRef()
+  const mapInst   = useRef()
+  const markerRef = useRef()
+
+  // Seleccionar primer tipo cuando cargue config
+  useEffect(() => {
+    if (TIPOS.length > 0 && !form.tipo) {
+      setForm(f => ({ ...f, tipo: TIPOS[0].key }))
+    }
+  }, [TIPOS])
 
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -69,11 +80,10 @@ export default function AddClientScreen({ onBack }) {
         const lng = pos.coords.longitude
         setUbicacion({ lat, lng })
         try {
-          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'Accept-Language': 'es' } })
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers:{ 'Accept-Language':'es' } })
           const data = await res.json()
           if (data.display_name) {
-            const parts = data.display_name.split(',')
-            upd('direccion', parts.slice(0, 3).join(',').trim())
+            upd('direccion', data.display_name.split(',').slice(0,3).join(',').trim())
           }
         } catch {}
         setBuscandoGPS(false)
@@ -81,10 +91,10 @@ export default function AddClientScreen({ onBack }) {
       },
       (err) => {
         setBuscandoGPS(false)
-        const msgs = { 1:'Permiso denegado.', 2:'No se pudo obtener la ubicación.', 3:'Tiempo agotado.' }
+        const msgs = { 1:'Permiso denegado.', 2:'No se pudo obtener ubicación.', 3:'Tiempo agotado.' }
         setGpsError(msgs[err.code] || 'Error de GPS')
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy:true, timeout:10000 }
     )
   }
 
@@ -98,9 +108,9 @@ export default function AddClientScreen({ onBack }) {
     import('leaflet').then(({ default: L }) => {
       delete L.Icon.Default.prototype._getIconUrl
       L.Icon.Default.mergeOptions({
-        iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconUrl:      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
         iconRetinaUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        shadowUrl:    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
       const map = L.map(mapRef.current).setView([ubicacion.lat, ubicacion.lng], 16)
       mapInst.current = map
@@ -129,6 +139,32 @@ export default function AddClientScreen({ onBack }) {
     })
     return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null } }
   }, [mapListo, ubicacion?.lat, ubicacion?.lng])
+
+  // ── GUARDAR EN FIREBASE ──────────────────────────
+  const handleGuardar = async () => {
+    if (!form.nombre) { alert('El nombre es obligatorio'); return }
+    setSaving(true)
+    try {
+      await agregarCliente({
+        nombre:    form.nombre,
+        tipo:      form.tipo || TIPOS[0]?.key || 'general',
+        contacto:  form.contacto,
+        telefono:  form.telefono,
+        direccion: form.direccion,
+        notas:     form.notas,
+        lat:       ubicacion?.lat || 10.48,
+        lng:       ubicacion?.lng || -66.87,
+        nivel:     'medio',
+        deuda:     0,
+        foto:      foto || null,
+      })
+      setDone(true)
+      setTimeout(onBack, 1600)
+    } catch (err) {
+      alert('Error al guardar: ' + err.message)
+      setSaving(false)
+    }
+  }
 
   if (done) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>
@@ -179,18 +215,27 @@ export default function AddClientScreen({ onBack }) {
           <input ref={fileRef} type="file" accept="image/*" onChange={handleFoto} style={{ display:'none' }} />
         </div>
 
-        {/* Tipo de cliente — DINÁMICO */}
+        {/* Tipo de cliente */}
         <Card>
           <p style={{ fontSize:13, fontWeight:700, color:C.gray600, marginBottom:10 }}>Tipo de cliente</p>
-          <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(TIPOS.length, 3)},1fr)`, gap:8 }}>
-            {TIPOS.map(t => (
-              <button key={t.key} onClick={() => upd('tipo', t.key)}
-                style={{ padding:'10px 6px', borderRadius:12, border:`2px solid ${form.tipo===t.key?t.color:C.gray200}`, background:form.tipo===t.key?t.color+'12':'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
-                <Icon name={t.icon} size={20} color={t.color} style={{ display:'block', margin:'0 auto 4px' }} />
-                <span style={{ fontSize:11, fontWeight:700, color:form.tipo===t.key?t.color:C.gray600 }}>{t.label}</span>
-              </button>
-            ))}
-          </div>
+          {TIPOS.length === 0 ? (
+            <div style={{ padding:'12px', background:'#FEF9C3', borderRadius:10, display:'flex', alignItems:'center', gap:8 }}>
+              <Icon name="alert" size={16} color="#854D0E" />
+              <p style={{ fontSize:12, color:'#854D0E', margin:0 }}>
+                Sin tipos configurados. Ve a Admin → Reconfigurar.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(TIPOS.length, 3)},1fr)`, gap:8 }}>
+              {TIPOS.map(t => (
+                <button key={t.key} onClick={() => upd('tipo', t.key)}
+                  style={{ padding:'10px 6px', borderRadius:12, border:`2px solid ${form.tipo===t.key?t.color:C.gray200}`, background:form.tipo===t.key?t.color+'12':'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+                  <Icon name={t.icon} size={20} color={t.color} style={{ display:'block', margin:'0 auto 4px' }} />
+                  <span style={{ fontSize:11, fontWeight:700, color:form.tipo===t.key?t.color:C.gray600 }}>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* Campos */}
@@ -247,13 +292,14 @@ export default function AddClientScreen({ onBack }) {
             style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }} />
         </div>
 
-        <Button icon="ok_circle" size="lg" fullWidth
-          onClick={() => {
-            if (!form.nombre) { alert('El nombre es obligatorio'); return }
-            setDone(true)
-            setTimeout(onBack, 1600)
-          }}>
-          Guardar cliente {ubicacion ? '📍' : ''}
+        <Button
+          icon="ok_circle"
+          size="lg"
+          fullWidth
+          disabled={saving}
+          onClick={handleGuardar}
+        >
+          {saving ? 'Guardando...' : `Guardar cliente ${ubicacion ? '📍' : ''}`}
         </Button>
       </div>
       <div style={{ height:90 }} />
