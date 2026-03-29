@@ -63,11 +63,11 @@ export default function DashboardScreen({ nav }) {
 
       {/* KPIs */}
       <div style={{ padding:'0 14px', marginTop:-14 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:10, marginBottom:10 }}>
           <KpiCard label="Ventas totales"   val={fmtUSD(total)}    sub={`${ventas.length} transacciones`} icon="dollar" color={C.teal}   />
           <KpiCard label="Deuda pendiente"  val={fmtUSD(deuda)}    sub={`${clientes.filter(c=>c.deuda>0).length} clientes`} icon="card" color={C.red} />
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:10, marginBottom:10 }}>
           <KpiCard label="Clientes activos" val={clientes.length}  sub={`${inact.length} inactivos`} icon="users"  color="#3B82F6" />
           <KpiCard label="Rutas creadas"    val={rutas.length}     sub={`${rutas.filter(r=>r.estado==='pendiente').length} pendientes`} icon="route" color={C.amber} />
         </div>
