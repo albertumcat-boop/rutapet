@@ -128,3 +128,10 @@ select {
   gap: 10px;
   margin-bottom: 10px;
 }
+/* Ocultar botón entrar del nav en móvil */
+@media (max-width: 480px) {
+  :root { --nav-btn-display: none; }
+}
+@media (min-width: 481px) {
+  :root { --nav-btn-display: flex; }
+}
