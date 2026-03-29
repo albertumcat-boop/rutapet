@@ -27,9 +27,12 @@ export const agregarCliente = async (data) => {
 }
 
 export const obtenerClientes = async () => {
-  const q    = query(col('clientes'), where('vendedorId','==',uid()), where('activo','==',true))
+  // Quitamos el filtro de activo para evitar necesitar índice compuesto
+  const q    = query(col('clientes'), where('vendedorId', '==', uid()))
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(c => c.activo !== false) // filtramos en el cliente
 }
 
 export const actualizarCliente = async (id, data) => {
@@ -47,9 +50,11 @@ export const agregarProducto = async (data) => {
 }
 
 export const obtenerProductos = async () => {
-  const q    = query(col('productos'), where('tenantId','==',uid()), where('activo','==',true))
+  const q    = query(col('productos'), where('tenantId', '==', uid()))
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.activo !== false)
 }
 
 export const actualizarProducto = async (id, data) => {
