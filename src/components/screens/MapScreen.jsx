@@ -55,11 +55,12 @@ export default function MapScreen({ nav, onBack }) {
       if (!mapRef.current || mapInstanceRef.current) return
       const map = L.map(mapRef.current).setView([10.48, -66.87], 12)
       mapInstanceRef.current = map
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map)
-      setMapReady(true)
+     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(map)
+setTimeout(() => map.invalidateSize(), 100)
+setMapReady(true)
     }
     init()
     return () => {
@@ -198,7 +199,7 @@ export default function MapScreen({ nav, onBack }) {
       </div>
 
       {/* Mapa Leaflet */}
-      <div ref={mapRef} style={{ height:340, width:'100%', zIndex:1 }} />
+     <div ref={mapRef} style={{ height:340, width:'100%', zIndex:1, display:'block', position:'relative' }} />
 
       {/* Botones de acción */}
       <div style={{ padding:'14px 14px 0' }}>
