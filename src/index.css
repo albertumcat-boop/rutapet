@@ -47,13 +47,18 @@ input:focus, select:focus, textarea:focus {
   animation: fadeIn 0.22s ease-out both;
 }
 
-/* ── Fix global texto ── */
-* {
-  word-break: break-word;
-  overflow-wrap: break-word;
-  min-width: 0;
+/* ── Fix mapa Leaflet ── */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  font-family: 'Nunito', sans-serif !important;
+  z-index: 1;
 }
 
+#rutapet-map,
+[ref="mapRef"] {
+  height: 340px !important;
+}
 img {
   max-width: 100%;
   height: auto;
