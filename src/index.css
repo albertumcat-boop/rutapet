@@ -8,13 +8,13 @@ html, body {
   height: 100%;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   font-family: 'Nunito', sans-serif;
   background: #F1F5F9;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 #root {
@@ -40,18 +40,16 @@ input:focus, select:focus, textarea:focus {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
 .screen-enter {
   animation: fadeIn 0.22s ease-out both;
 }
 
 /* ── Fix texto que se monta ── */
-p, span, h1, h2, h3, h4, label {
+p, span, h1, h2, h3, h4, label, button {
   word-break: break-word;
   overflow-wrap: break-word;
 }
@@ -60,21 +58,10 @@ p, span, h1, h2, h3, h4, label {
 img {
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
-/* ── Fix grids en pantallas pequeñas ── */
-@media (max-width: 360px) {
-  .grid-2 {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* ── Fix Leaflet en móvil ── */
-.leaflet-container {
-  font-family: 'Nunito', sans-serif !important;
-}
-
-/* ── Fix select nativo en iOS ── */
+/* ── Fix select iOS ── */
 select {
   -webkit-appearance: none;
   appearance: none;
@@ -84,22 +71,12 @@ select {
   padding-right: 36px !important;
 }
 
-/* ── Fix overflow en cards ── */
-.card-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+/* ── Fix Leaflet ── */
+.leaflet-container {
+  font-family: 'Nunito', sans-serif !important;
 }
 
-/* ── Fix bottom nav safe area iPhone ── */
-.bottom-nav {
-  padding-bottom: env(safe-area-inset-bottom, 8px);
-}
-
-/* ── Fix modales en móvil ── */
-@media (max-width: 400px) {
-  .modal-grid-3 {
-    grid-template-columns: 1fr 1fr !important;
-  }
+/* ── Safe area iPhone ── */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
