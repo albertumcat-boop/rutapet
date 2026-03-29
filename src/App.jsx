@@ -99,8 +99,11 @@ export default function App() {
 
   // ── Login / Registro ──────────────────────────────
   if (!loggedIn) {
-    return <LoginScreen onLogin={() => { setLoggedIn(true); setShowLanding(false) }} />
-  }
+  return <LoginScreen
+    onLogin={() => { setLoggedIn(true); setShowLanding(false) }}
+    onVolver={() => setShowLanding(true)}
+  />
+}
 
   // ── Onboarding — primera vez ──────────────────────
   if (!config.onboardingCompleto) return <OnboardingScreen />
