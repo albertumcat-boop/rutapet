@@ -11,7 +11,7 @@ import {
 
 const provider = new GoogleAuthProvider()
 
-export default function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onLogin, onVolver }) {
   const [modo,    setModo]    = useState('login')
   const [email,   setEmail]   = useState('')
   const [pass,    setPass]    = useState('')
@@ -74,7 +74,15 @@ export default function LoginScreen({ onLogin }) {
 
   return (
     <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 20px' }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
+<div style={{ width: '100%', maxWidth: 380 }}>
+
+  {/* Botón volver a landing */}
+  {onVolver && (
+    <button onClick={onVolver}
+      style={{ background:'none', border:'none', color:C.gray400, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:6, fontSize:13, marginBottom:20, padding:0 }}>
+      ← Volver al inicio
+    </button>
+  )}
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
