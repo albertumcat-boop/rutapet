@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { C, nivelColor } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
+import { calcularPorcentajeInventario, colorPorcentaje } from '../../services/firestore'
 import { fmtUSD, daysSince } from '../../utils/helpers'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
@@ -9,40 +10,51 @@ import Badge from '../shared/Badge'
 import Button from '../shared/Button'
 
 export default function ClientsScreen({ nav }) {
-  const { clientes, loading } = useAppData()
-  const { config }            = useConfig()
-  const [search, setSearch]   = useState('')
-  const [tipo,   setTipo]     = useState('todos')
+  const { clientes, inventario, loading } = useAppData()
+  const { config }                        = useConfig()
+  const [search, setSearch] = useState('')
+  const [tipo,   setTipo]   = useState('todos')
+  const [orden,  setOrden]  = useState('nombre')
 
   const getTipoColor = (key) => config.tiposCliente.find(t => t.key === key)?.color || C.gray400
   const getTipoIcon  = (key) => config.tiposCliente.find(t => t.key === key)?.icon  || 'users'
   const getTipoLabel = (key) => config.tiposCliente.find(t => t.key === key)?.label || key
 
-  const filtered = clientes.filter(c =>
+  const getInvPct = (clienteId) => {
+    const inv = inventario.filter(i => i.clienteId === clienteId)
+    return calcularPorcentajeInventario(inv)
+  }
+
+  let filtered = clientes.filter(c =>
     (tipo === 'todos' || c.tipo === tipo) &&
     (c.nombre || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  return (
-    <div className="screen-enter" style={{ background: C.gray50, minHeight: '100vh' }}>
+  // Ordenar
+  if (orden === 'inventario') {
+    filtered = [...filtered].sort((a,b) => getInvPct(a.id) - getInvPct(b.id))
+  } else if (orden === 'deuda') {
+    filtered = [...filtered].sort((a,b) => (b.deuda||0) - (a.deuda||0))
+  } else if (orden === 'visita') {
+    filtered = [...filtered].sort((a,b) => {
+      const da = daysSince(a.ultimaVisita?.toDate?.() || a.ultimaVisita || new Date())
+      const db = daysSince(b.ultimaVisita?.toDate?.() || b.ultimaVisita || new Date())
+      return db - da
+    })
+  }
 
-      {/* Header */}
-      <div style={{ background: C.navy, padding: '20px 14px 14px', color: '#fff' }}>
+  return (
+    <div className="screen-enter" style={{ background:C.gray50, minHeight:'100vh' }}>
+      <div style={{ background:C.navy, padding:'20px 14px 14px', color:'#fff' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
           <h1 style={{ fontSize:20, fontWeight:900, margin:0 }}>Clientes</h1>
           <Button icon="plus" size="sm" onClick={() => nav('addClient')}>Nuevo</Button>
         </div>
         <div style={{ display:'flex', alignItems:'center', background:'#ffffff20', borderRadius:12, padding:'8px 12px', gap:8, marginBottom:10 }}>
           <Icon name="search" size={16} color={C.gray400} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar cliente..."
-            style={{ background:'none', border:'none', color:'#fff', fontSize:14, flex:1, fontFamily:'inherit' }}
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente..."
+            style={{ background:'none', border:'none', color:'#fff', fontSize:14, flex:1, fontFamily:'inherit' }} />
         </div>
-
-        {/* Filtros dinámicos */}
         <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2 }}>
           <button onClick={() => setTipo('todos')}
             style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:tipo==='todos'?C.teal:'#ffffff20', color:'#fff', border:'none', flexShrink:0 }}>
@@ -72,7 +84,17 @@ export default function ClientsScreen({ nav }) {
         ))}
       </div>
 
-      {/* Lista */}
+      {/* Orden */}
+      <div style={{ background:'#fff', padding:'8px 14px', borderBottom:`1px solid ${C.gray200}`, display:'flex', gap:6, overflowX:'auto' }}>
+        <span style={{ fontSize:11, color:C.gray400, flexShrink:0, display:'flex', alignItems:'center' }}>Ordenar:</span>
+        {[['nombre','Nombre'],['inventario','Inventario ↑'],['deuda','Deuda ↓'],['visita','Sin visita']].map(([k,l]) => (
+          <button key={k} onClick={() => setOrden(k)}
+            style={{ padding:'4px 10px', borderRadius:16, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:orden===k?C.teal+'15':'transparent', color:orden===k?C.teal:C.gray400, border:`1px solid ${orden===k?C.teal:C.gray200}`, flexShrink:0 }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
       <div style={{ padding:'12px 14px' }}>
         {loading ? (
           <div style={{ textAlign:'center', padding:'40px 0' }}>
@@ -96,12 +118,25 @@ export default function ClientsScreen({ nav }) {
           const tColor = getTipoColor(c.tipo)
           const tIcon  = getTipoIcon(c.tipo)
           const tLabel = getTipoLabel(c.tipo)
+          const pct    = getInvPct(c.id)
+          const invs   = inventario.filter(i => i.clienteId === c.id)
+          const pctCol = colorPorcentaje(pct)
+
           return (
             <Card key={c.id} onClick={() => nav('clientDetail', c)}>
               <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                <div style={{ width:46, height:46, borderRadius:14, background:tColor+'15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <Icon name={tIcon} size={22} color={tColor} />
+                {/* Ícono con indicador de inventario */}
+                <div style={{ position:'relative', flexShrink:0 }}>
+                  <div style={{ width:46, height:46, borderRadius:14, background:tColor+'15', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <Icon name={tIcon} size={22} color={tColor} />
+                  </div>
+                  {invs.length > 0 && (
+                    <div style={{ position:'absolute', bottom:-2, right:-2, width:16, height:16, borderRadius:'50%', background:pctCol, border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <span style={{ fontSize:7, color:'#fff', fontWeight:900 }}>{pct}</span>
+                    </div>
+                  )}
                 </div>
+
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                     <span style={{ fontSize:14, fontWeight:700, color:C.gray800 }}>{c.nombre}</span>
@@ -117,10 +152,18 @@ export default function ClientsScreen({ nav }) {
                         {dias===0?'Hoy':`Hace ${dias}d`}
                       </span>
                     </div>
-                    {c.deuda > 0 && (
-                      <Badge bg="#FEE2E2" txt="#991B1B">Debe {fmtUSD(c.deuda)}</Badge>
+                    {c.deuda > 0 && <Badge bg="#FEE2E2" txt="#991B1B">Debe {fmtUSD(c.deuda)}</Badge>}
+                    {invs.length > 0 && (
+                      <Badge bg={pctCol+'20'} txt={pctCol}>{pct}% inv.</Badge>
                     )}
                   </div>
+
+                  {/* Mini barra inventario */}
+                  {invs.length > 0 && (
+                    <div style={{ height:3, background:C.gray100, borderRadius:2, marginTop:6, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, background:pctCol, borderRadius:2 }} />
+                    </div>
+                  )}
                 </div>
                 <Icon name="chevron" size={16} color={C.gray400} />
               </div>
