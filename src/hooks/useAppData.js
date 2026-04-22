@@ -6,23 +6,20 @@ import {
   obtenerProductos,
   obtenerVisitas,
   obtenerRutas,
+  obtenerTodoInventario,
 } from '../services/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
-
-// ═══════════════════════════════════════════════════
-//  Hook central — carga TODOS los datos desde Firebase
-//  Reemplaza los imports de constants/data.js
-// ═══════════════════════════════════════════════════
 
 let cachedData = null
 
 export function useAppData() {
   const [data,    setData]    = useState(cachedData || {
-    clientes:  [],
-    ventas:    [],
-    productos: [],
-    visitas:   [],
-    rutas:     [],
+    clientes:   [],
+    ventas:     [],
+    productos:  [],
+    visitas:    [],
+    rutas:      [],
+    inventario: [],
   })
   const [loading, setLoading] = useState(!cachedData)
   const [error,   setError]   = useState(null)
@@ -31,14 +28,15 @@ export function useAppData() {
     setLoading(true)
     setError(null)
     try {
-      const [clientes, ventas, productos, visitas, rutas] = await Promise.all([
+      const [clientes, ventas, productos, visitas, rutas, inventario] = await Promise.all([
         obtenerClientes(),
         obtenerVentas(),
         obtenerProductos(),
         obtenerVisitas(),
         obtenerRutas(),
+        obtenerTodoInventario(),
       ])
-      const newData = { clientes, ventas, productos, visitas, rutas }
+      const newData = { clientes, ventas, productos, visitas, rutas, inventario }
       cachedData = newData
       setData(newData)
     } catch (err) {
@@ -56,7 +54,7 @@ export function useAppData() {
         cargarTodo()
       } else {
         cachedData = null
-        setData({ clientes:[], ventas:[], productos:[], visitas:[], rutas:[] })
+        setData({ clientes:[], ventas:[], productos:[], visitas:[], rutas:[], inventario:[] })
       }
     })
     return unsub
