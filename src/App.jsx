@@ -1,3 +1,7 @@
+/**
+ * App.jsx — Router principal
+ * Auditado: manejo de estado, limpieza de efectos, rutas
+ */
 import { useState, useEffect } from 'react'
 import { auth } from '../firebase/firebase.config'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -23,30 +27,58 @@ import AdminScreen         from './components/screens/AdminScreen'
 import AboutScreen         from './components/screens/AboutScreen'
 import { C } from './constants/colors'
 
-const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
+// Pantallas que muestran la barra de navegación inferior
+const NAV_SCREENS = ['dashboard', 'clients', 'map', 'analytics', 'more']
+
+const LoadingScreen = () => (
+  <div style={{
+    minHeight:'100vh', background:C.navy,
+    display:'flex', alignItems:'center', justifyContent:'center',
+  }}>
+    <div style={{ textAlign:'center' }}>
+      <div style={{
+        width:60, height:60, borderRadius:16, background:C.teal,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        margin:'0 auto 16px',
+        boxShadow:`0 8px 32px ${C.teal}55`,
+      }}>
+        <Icon name="route" size={30} color="#fff" />
+      </div>
+      <div style={{
+        width:28, height:28,
+        border:`3px solid ${C.teal}`,
+        borderTopColor:'transparent',
+        borderRadius:'50%',
+        animation:'spin 0.7s linear infinite',
+        margin:'0 auto 12px',
+      }} />
+      <p style={{ color:C.gray400, fontSize:13 }}>Cargando RutaVentas...</p>
+    </div>
+  </div>
+)
 
 export default function App() {
-  const { config, loading } = useConfig()
+  const { config, loading: configLoading } = useConfig()
   const [loggedIn,    setLoggedIn]    = useState(false)
-  const [checking,    setChecking]    = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
   const [showLanding, setShowLanding] = useState(false)
   const [screen,      setScreen]      = useState('dashboard')
-  const [data,        setData]        = useState(null)
+  const [screenData,  setScreenData]  = useState(null)
   const [history,     setHistory]     = useState([])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setLoggedIn(!!user)
-      setChecking(false)
+      setAuthChecked(true)
       if (!user) setShowLanding(true)
     })
     return unsub
   }, [])
 
-  const nav = (to, d = null) => {
-    setHistory(h => [...h, { screen, data }])
+  const nav = (to, data = null) => {
+    setHistory(h => [...h, { screen, data: screenData }])
     setScreen(to)
-    setData(d)
+    setScreenData(data)
     window.scrollTo(0, 0)
   }
 
@@ -55,68 +87,66 @@ export default function App() {
       const prev = history[history.length - 1]
       setHistory(h => h.slice(0, -1))
       setScreen(prev.screen)
-      setData(prev.data)
+      setScreenData(prev.data)
     } else {
       setScreen('dashboard')
-      setData(null)
+      setScreenData(null)
     }
     window.scrollTo(0, 0)
   }
 
-  const tabChange = (s) => {
+  const tabChange = (tab) => {
     setHistory([])
-    setScreen(s)
-    setData(null)
+    setScreen(tab)
+    setScreenData(null)
     window.scrollTo(0, 0)
   }
 
-  const handleLogout = () => {
-    auth.signOut()
+  const handleLogout = async () => {
+    try {
+      await auth.signOut()
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err)
+    }
     setLoggedIn(false)
     setShowLanding(true)
     setScreen('dashboard')
     setHistory([])
-    setData(null)
+    setScreenData(null)
   }
 
-  // ── Pantalla de carga (Firebase + Config) ─────────
-  if (checking || loading) return (
-    <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-          <Icon name="route" size={30} color="#fff" />
-        </div>
-        <div style={{ width:32, height:32, border:`3px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto 12px' }} />
-        <p style={{ color:C.gray400, fontSize:14 }}>Cargando...</p>
-      </div>
-    </div>
-  )
+  // ── Estados de carga ──────────────────────────────────
+  if (!authChecked || configLoading) return <LoadingScreen />
 
-  // ── Landing — visitante no logueado ───────────────
+  // ── Landing — visitante no logueado ───────────────────
   if (!loggedIn && showLanding) {
     return <LandingScreen onEntrar={() => setShowLanding(false)} />
   }
 
-  // ── Login / Registro ──────────────────────────────
+  // ── Login ─────────────────────────────────────────────
   if (!loggedIn) {
-  return <LoginScreen
-    onLogin={() => { setLoggedIn(true); setShowLanding(false) }}
-    onVolver={() => setShowLanding(true)}
-  />
-}
+    return (
+      <LoginScreen
+        onLogin={() => { setLoggedIn(true); setShowLanding(false) }}
+        onVolver={() => setShowLanding(true)}
+      />
+    )
+  }
 
-  // ── Onboarding — primera vez ──────────────────────
-  if (!config.onboardingCompleto) return <OnboardingScreen />
+  // ── Onboarding — primera vez ──────────────────────────
+  if (!config.onboardingCompleto) {
+    return <OnboardingScreen />
+  }
 
-  // ── App principal ─────────────────────────────────
+  // ── App principal ─────────────────────────────────────
   const renderScreen = () => {
     switch (screen) {
       case 'dashboard':    return <DashboardScreen    nav={nav} />
       case 'clients':      return <ClientsScreen      nav={nav} />
-      case 'clientDetail': return <ClientDetailScreen cliente={data} onBack={goBack} nav={nav} />
+      case 'clientDetail': return <ClientDetailScreen cliente={screenData} onBack={goBack} nav={nav} />
       case 'addClient':    return <AddClientScreen    onBack={goBack} />
       case 'map':          return <MapScreen          nav={nav} onBack={goBack} />
-      case 'addSale':      return <AddSaleScreen      onBack={goBack} initCId={data?.clienteId} />
+      case 'addSale':      return <AddSaleScreen      onBack={goBack} initCId={screenData?.clienteId} />
       case 'products':     return <ProductsScreen     onBack={goBack} />
       case 'payments':     return <PaymentsScreen     onBack={goBack} />
       case 'analytics':    return <AnalyticsScreen    onBack={goBack} />
@@ -130,7 +160,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ maxWidth:480, margin:'0 auto', position:'relative' }}>
+    <div style={{ maxWidth:480, margin:'0 auto', position:'relative', minHeight:'100vh' }}>
       {renderScreen()}
       {NAV_SCREENS.includes(screen) && (
         <BottomNav current={screen} onChange={tabChange} />
