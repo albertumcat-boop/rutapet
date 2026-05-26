@@ -1,4 +1,8 @@
-// Todos los datos vienen de Firebase — este archivo está vacío intencionalmente
+/**
+ * data.js — Archivo vacío
+ * Todos los datos vienen de Firebase Firestore
+ * Este archivo existe solo para no romper imports legacy
+ */
 
 export const CURRENT_USER     = {}
 export const CLIENTES         = []
