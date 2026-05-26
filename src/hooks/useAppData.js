@@ -1,4 +1,8 @@
-import { useState, useEffect } from 'react'
+/**
+ * useAppData.js — Hook central de datos
+ * Auditado: memory leak, race conditions, cache invalidation
+ */
+import { useState, useEffect, useRef } from 'react'
 import { auth } from '../../firebase/firebase.config'
 import {
   obtenerClientes,
@@ -10,55 +14,94 @@ import {
 } from '../services/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 
-let cachedData = null
+const EMPTY_DATA = {
+  clientes:   [],
+  ventas:     [],
+  productos:  [],
+  visitas:    [],
+  rutas:      [],
+  inventario: [],
+}
+
+// Cache en memoria — se limpia al cambiar de usuario
+let cache     = null
+let cacheUid  = null
 
 export function useAppData() {
-  const [data,    setData]    = useState(cachedData || {
-    clientes:   [],
-    ventas:     [],
-    productos:  [],
-    visitas:    [],
-    rutas:      [],
-    inventario: [],
-  })
-  const [loading, setLoading] = useState(!cachedData)
+  const [data,    setData]    = useState(cache || EMPTY_DATA)
+  const [loading, setLoading] = useState(!cache)
   const [error,   setError]   = useState(null)
+  const mountedRef = useRef(true)
 
-  const cargarTodo = async () => {
+  const cargarTodo = async (uid) => {
+    if (!mountedRef.current) return
     setLoading(true)
     setError(null)
     try {
-      const [clientes, ventas, productos, visitas, rutas, inventario] = await Promise.all([
-        obtenerClientes(),
-        obtenerVentas(),
-        obtenerProductos(),
-        obtenerVisitas(),
-        obtenerRutas(),
-        obtenerTodoInventario(),
-      ])
+      const [clientes, ventas, productos, visitas, rutas, inventario] =
+        await Promise.all([
+          obtenerClientes(),
+          obtenerVentas(),
+          obtenerProductos(),
+          obtenerVisitas(),
+          obtenerRutas(),
+          obtenerTodoInventario(),
+        ])
+
+      if (!mountedRef.current) return
+
       const newData = { clientes, ventas, productos, visitas, rutas, inventario }
-      cachedData = newData
+      cache    = newData
+      cacheUid = uid
       setData(newData)
     } catch (err) {
-      console.error('Error cargando datos:', err)
-      setError(err.message)
+      if (!mountedRef.current) return
+      console.error('useAppData error:', err)
+      setError(err.message || 'Error cargando datos')
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }
 
   useEffect(() => {
+    mountedRef.current = true
+
     const unsub = onAuthStateChanged(auth, (user) => {
+      if (!mountedRef.current) return
+
       if (user) {
-        cachedData = null
-        cargarTodo()
+        // Si el usuario cambió, limpiar cache del usuario anterior
+        if (cacheUid && cacheUid !== user.uid) {
+          cache    = null
+          cacheUid = null
+        }
+        // Usar cache si es del mismo usuario
+        if (cache && cacheUid === user.uid) {
+          setData(cache)
+          setLoading(false)
+        } else {
+          cargarTodo(user.uid)
+        }
       } else {
-        cachedData = null
-        setData({ clientes:[], ventas:[], productos:[], visitas:[], rutas:[], inventario:[] })
+        cache    = null
+        cacheUid = null
+        setData(EMPTY_DATA)
+        setLoading(false)
       }
     })
-    return unsub
+
+    return () => {
+      mountedRef.current = false
+      unsub()
+    }
   }, [])
 
-  return { ...data, loading, error, recargar: cargarTodo }
+  const recargar = async () => {
+    cache    = null
+    cacheUid = null
+    const user = auth.currentUser
+    if (user) await cargarTodo(user.uid)
+  }
+
+  return { ...data, loading, error, recargar }
 }
