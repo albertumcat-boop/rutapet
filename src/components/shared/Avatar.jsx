@@ -1,15 +1,31 @@
-import { C } from '../../constants/colors'
-
-export default function Avatar({ initials = '?', size = 40, bg = C.teal }) {
+/**
+ * Avatar.jsx — Avatar con iniciales
+ * Auditado: fallback si no hay initials
+ */
+export default function Avatar({ initials = '?', size = 40, bg = '#0FBCAA', style: s = {} }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: bg + '25',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0,
-    }}>
-      <span style={{ fontSize: size * 0.34, fontWeight: 800, color: bg }}>
-        {initials}
+    <div
+      aria-hidden="true"
+      style={{
+        width:          size,
+        height:         size,
+        borderRadius:   size * 0.35,
+        background:     bg,
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        flexShrink:     0,
+        ...s,
+      }}
+    >
+      <span style={{
+        fontSize:   size * 0.38,
+        fontWeight: 900,
+        color:      '#fff',
+        userSelect: 'none',
+        lineHeight: 1,
+      }}>
+        {String(initials).slice(0, 2).toUpperCase() || '?'}
       </span>
     </div>
   )
