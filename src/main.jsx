@@ -1,13 +1,23 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
-import { ConfigProvider } from './context/ConfigContext'
+/**
+ * main.jsx — Punto de entrada
+ * Auditado: StrictMode, providers correctamente anidados
+ */
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import './index.css'
+import App from './App.jsx'
+import { ConfigProvider } from './context/ConfigContext.jsx'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+const root = document.getElementById('root')
+
+if (!root) {
+  throw new Error('No se encontró el elemento #root en index.html')
+}
+
+createRoot(root).render(
+  <StrictMode>
     <ConfigProvider>
       <App />
     </ConfigProvider>
-  </React.StrictMode>
+  </StrictMode>
 )
