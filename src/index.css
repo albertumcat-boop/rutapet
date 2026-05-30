@@ -21,7 +21,6 @@ body {
 
 #root {
   min-height: 100vh;
-  overflow-x: hidden;
 }
 
 input, select, textarea, button {
@@ -32,7 +31,7 @@ input:focus, select:focus, textarea:focus {
   outline: none;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 
@@ -71,6 +70,7 @@ select {
 /* ── Leaflet ── */
 .leaflet-container {
   font-family: 'Nunito', sans-serif !important;
+  z-index: 1;
 }
 
 /* ── Safe area iPhone ── */
@@ -78,7 +78,15 @@ select {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* ── Grids landing ── */
+/* ── KPI grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* ── Landing grids ── */
 .planes-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -115,13 +123,40 @@ select {
   .rubros-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 10px;
+/* ── RESPONSIVE DESKTOP ── */
+/* En desktop, ocultar el TopBar sticky de cada pantalla
+   porque el App.jsx ya maneja la topbar global */
+@media (min-width: 768px) {
+
+  /* Ajustar padding del contenido en desktop */
+  .screen-enter {
+    animation: none;
+  }
+
+  /* El bottom nav no se muestra en desktop — lo controla App.jsx */
+
+  /* Modales centrados en desktop */
+  .modal-overlay {
+    align-items: center !important;
+  }
+
+  /* KPI grid más columnas en desktop */
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* Features grid 2 columnas */
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Pasos en 3 columnas */
+  .pasos-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
+/* Ocultar botón nav en móvil (landing) */
 @media (max-width: 480px) {
   :root { --nav-btn-display: none; }
 }
