@@ -28,14 +28,15 @@ const ESTADOS_PAGO = [
 export default function AddSaleScreen({ onBack, initCId }) {
   const { clientes, productos, recargar } = useAppData()
 
-  const [cId,     setCId]    = useState(initCId || '')
-  const [items,   setItems]  = useState([{ pId:'', qty:1 }])
-  const [metodo,  setMetodo] = useState('efectivo')
-  const [estado,  setEstado] = useState('pagado')
-  const [notas,   setNotas]  = useState('')
-  const [saving,  setSaving] = useState(false)
-  const [done,    setDone]   = useState(false)
-  const [error,   setError]  = useState('')
+  const [cId,          setCId]         = useState(initCId || '')
+  const [items,        setItems]        = useState([{ pId: '', qty: 1 }])
+  const [metodo,       setMetodo]       = useState('efectivo')
+  const [estado,       setEstado]       = useState('pagado')
+  const [montoPagado,  setMontoPagado]  = useState('')
+  const [notas,        setNotas]        = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [done,         setDone]         = useState(false)
+  const [error,        setError]        = useState('')
 
   const addItem  = () => setItems(prev => [...prev, { pId:'', qty:1 }])
   const rmItem   = (idx) => setItems(prev => prev.filter((_,i) => i !== idx))
@@ -56,14 +57,16 @@ export default function AddSaleScreen({ onBack, initCId }) {
 
     setSaving(true)
     try {
+      const mPagado = estado === 'parcial' ? (parseFloat(montoPagado) || 0) : (estado === 'pagado' ? total : 0)
       await agregarVenta({
         clienteId:  cId,
         items:      itemsValidos.map(it => ({
-          pId:   it.pId,
-          qty:   Number(it.qty),
+          pId:    it.pId,
+          qty:    Number(it.qty),
           precio: Number(productos.find(p => p.id === it.pId)?.precio || 0),
         })),
         total,
+        montoPagado: mPagado,
         metodoPago: metodo,
         estado,
         notas,
@@ -185,6 +188,27 @@ export default function AddSaleScreen({ onBack, initCId }) {
             </button>
           ))}
         </div>
+
+        {/* Monto inicial (solo para parcial) */}
+        {estado === 'parcial' && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 13, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 6 }}>
+              Monto pagado ahora (abono inicial)
+            </label>
+            <input
+              type="number" min="0" step="0.01"
+              value={montoPagado}
+              onChange={e => setMontoPagado(e.target.value)}
+              placeholder="0.00"
+              style={{ width: '100%', padding: '11px 12px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+            {montoPagado && parseFloat(montoPagado) > 0 && parseFloat(montoPagado) < total && (
+              <p style={{ fontSize: 12, color: C.amber, margin: '4px 0 0', fontWeight: 600 }}>
+                Queda pendiente: {(total - parseFloat(montoPagado)).toFixed(2)}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Notas */}
         <div style={{ marginBottom:14 }}>

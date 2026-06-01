@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Verifica si el usuario pertenece a una empresa (multi-usuario)
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/usuarios/$(uid())).data;
+    }
+
+    // El tenantId del recurso debe coincidir con el uid del usuario
+    // O con el empresaId al que pertenece el usuario (multi-empresa)
+    function isTenantOwner(resource) {
+      return isAuth() && (
+        resource.data.tenantId == uid() ||
+        resource.data.empresaId == uid() ||
+        resource.data.vendedorId == uid()
+      );
+    }
+
+    function isWritingOwnTenant() {
+      return isAuth() && (
+        request.resource.data.tenantId == uid() ||
+        request.resource.data.vendedorId == uid()
+      );
+    }
+
+    // ── Usuarios ────────────────────────────────────────────────────────
+    match /usuarios/{userId} {
+      allow read:  if isAuth() && uid() == userId;
+      allow write: if isAuth() && uid() == userId;
+    }
+
+    // ── Config (por empresa/tenant) ─────────────────────────────────────
+    match /config/{configId} {
+      allow read:  if isAuth() && (
+        uid() == configId ||
+        getUserDoc().empresaId == configId
+      );
+      allow write: if isAuth() && (
+        uid() == configId ||
+        getUserDoc().empresaId == configId
+      );
+    }
+
+    // ── Empresas ────────────────────────────────────────────────────────
+    match /empresas/{empresaId} {
+      allow read:  if isAuth() && (
+        uid() == empresaId ||
+        getUserDoc().empresaId == empresaId
+      );
+      allow write: if isAuth() && uid() == empresaId;
+    }
+
+    // ── Clientes ───────────────────────────────────────────────────────
+    match /clientes/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if false; // Solo soft delete
+    }
+
+    // ── Productos ──────────────────────────────────────────────────────
+    match /productos/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if false;
+    }
+
+    // ── Ventas ─────────────────────────────────────────────────────────
+    match /ventas/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if false;
+    }
+
+    // ── Visitas ────────────────────────────────────────────────────────
+    match /visitas/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if false;
+    }
+
+    // ── Rutas ──────────────────────────────────────────────────────────
+    match /rutas/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if isAuth() && isTenantOwner(resource);
+    }
+
+    // ── Pagos ──────────────────────────────────────────────────────────
+    match /pagos/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if false;
+    }
+
+    // ── Inventario ─────────────────────────────────────────────────────
+    match /inventario/{docId} {
+      allow read:   if isAuth() && isTenantOwner(resource);
+      allow create: if isAuth() && isWritingOwnTenant();
+      allow update: if isAuth() && isTenantOwner(resource);
+      allow delete: if isAuth() && isTenantOwner(resource);
+    }
+
+    // ── Invitaciones (para multi-usuario) ──────────────────────────────
+    match /invitaciones/{docId} {
+      // Cualquier usuario autenticado puede leer su propia invitación por email
+      allow read:  if isAuth();
+      // Solo el admin (dueño de empresa) puede crear invitaciones
+      allow create: if isAuth() && request.resource.data.empresaId == uid();
+      allow update: if isAuth();
+      allow delete: if isAuth() && (
+        resource.data.empresaId == uid() ||
+        resource.data.emailInvitado == request.auth.token.email
+      );
+    }
+
+    // ── Bloquear todo lo demás ──────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

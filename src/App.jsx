@@ -1,12 +1,11 @@
 /**
- * App.jsx — Router principal con layout responsive
- * Mobile: bottom nav + full screen
- * Desktop (>=768px): sidebar + contenido a la derecha
+ * App.jsx — Router principal con layout responsive + nuevas pantallas VetRuta
  */
 import { useState, useEffect } from 'react'
 import { auth } from '../firebase/firebase.config'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useConfig } from './context/ConfigContext'
+import { useToast } from './context/ToastContext'
 import Icon from './components/shared/Icon'
 import BottomNav           from './components/shared/BottomNav'
 import Sidebar             from './components/shared/Sidebar'
@@ -27,12 +26,12 @@ import VisitsScreen        from './components/screens/VisitsScreen'
 import MoreScreen          from './components/screens/MoreScreen'
 import AdminScreen         from './components/screens/AdminScreen'
 import AboutScreen         from './components/screens/AboutScreen'
+import ExpiryScreen        from './components/screens/ExpiryScreen'
+import TeamScreen          from './components/screens/TeamScreen'
 import { C } from './constants/colors'
 
-// Pantallas que muestran la barra de navegación
-const NAV_SCREENS = ['dashboard','clients','map','analytics','more']
+const NAV_SCREENS = ['dashboard', 'clients', 'map', 'analytics', 'more']
 
-// Hook para detectar si es desktop
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768)
   useEffect(() => {
@@ -44,19 +43,20 @@ function useIsDesktop() {
 }
 
 const LoadingScreen = () => (
-  <div style={{ minHeight:'100vh', background:C.navy, display:'flex', alignItems:'center', justifyContent:'center' }}>
-    <div style={{ textAlign:'center' }}>
-      <div style={{ width:60, height:60, borderRadius:16, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:`0 8px 32px ${C.teal}55` }}>
-        <Icon name="route" size={30} color="#fff" />
+  <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ width: 60, height: 60, borderRadius: 16, background: C.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: `0 8px 32px ${C.teal}55` }}>
+        <Icon name="paw" size={30} color="#fff" />
       </div>
-      <div style={{ width:28, height:28, border:`3px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto 12px' }} />
-      <p style={{ color:C.gray400, fontSize:13 }}>Cargando RutaVentas...</p>
+      <div style={{ width: 28, height: 28, border: `3px solid ${C.teal}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
+      <p style={{ color: C.gray400, fontSize: 13 }}>Cargando VetRuta...</p>
     </div>
   </div>
 )
 
 export default function App() {
   const { config, loading: configLoading } = useConfig()
+  const toast    = useToast()
   const isDesktop = useIsDesktop()
 
   const [loggedIn,    setLoggedIn]    = useState(false)
@@ -104,6 +104,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try { await auth.signOut() } catch (err) { console.error(err) }
+    toast.info('Sesión cerrada')
     setLoggedIn(false)
     setShowLanding(true)
     setScreen('dashboard')
@@ -138,7 +139,7 @@ export default function App() {
       case 'addClient':    return <AddClientScreen    onBack={goBack} />
       case 'map':          return <MapScreen          nav={nav} onBack={goBack} />
       case 'addSale':      return <AddSaleScreen      onBack={goBack} initCId={screenData?.clienteId} />
-      case 'products':     return <ProductsScreen     onBack={goBack} />
+      case 'products':     return <ProductsScreen     onBack={goBack} nav={nav} />
       case 'payments':     return <PaymentsScreen     onBack={goBack} />
       case 'analytics':    return <AnalyticsScreen    onBack={goBack} />
       case 'routes':       return <RoutesScreen       onBack={goBack} />
@@ -146,63 +147,42 @@ export default function App() {
       case 'more':         return <MoreScreen         nav={nav} onLogout={handleLogout} />
       case 'admin':        return <AdminScreen        onBack={goBack} />
       case 'about':        return <AboutScreen        onBack={goBack} />
+      case 'expiry':       return <ExpiryScreen       onBack={goBack} />
+      case 'team':         return <TeamScreen         onBack={goBack} />
       default:             return <DashboardScreen    nav={nav} />
     }
   }
 
-  // ── DESKTOP LAYOUT ────────────────────────────────────────────
+  // ── DESKTOP LAYOUT ──────────────────────────────────────────
   if (isDesktop) {
     return (
-      <div style={{ display:'flex', minHeight:'100vh', background:C.gray50 }}>
-        {/* Sidebar fijo izquierda */}
-        <Sidebar
-          current={screen}
-          onChange={tabChange}
-          onLogout={handleLogout}
-        />
+      <div style={{ display: 'flex', minHeight: '100vh', background: C.gray50 }}>
+        <Sidebar current={screen} onChange={tabChange} onLogout={handleLogout} nav={nav} />
 
-        {/* Contenido principal */}
-        <main style={{
-          flex:       1,
-          minHeight:  '100vh',
-          overflowX:  'hidden',
-          overflowY:  'auto',
-          background: C.gray50,
-        }}>
+        <main style={{ flex: 1, minHeight: '100vh', overflowX: 'hidden', overflowY: 'auto', background: C.gray50 }}>
           {/* Topbar desktop */}
           <div style={{
-            background:     '#fff',
-            borderBottom:   `1px solid ${C.gray200}`,
-            padding:        '0 24px',
-            height:         56,
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'space-between',
-            position:       'sticky',
-            top:            0,
-            zIndex:         10,
+            background: '#fff', borderBottom: `1px solid ${C.gray200}`,
+            padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
           }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              {/* Breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {history.length > 0 && (
                 <button onClick={goBack}
-                  style={{ background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:C.gray400, fontFamily:'inherit', fontSize:13 }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: C.gray400, fontFamily: 'inherit', fontSize: 13 }}>
                   <Icon name="back" size={16} color={C.gray400} />
                   Volver
                 </button>
               )}
             </div>
-
-            {/* Botón nueva venta */}
             <button onClick={() => nav('addSale')}
-              style={{ background:C.teal, border:'none', borderRadius:10, padding:'8px 16px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:6 }}>
+              style={{ background: C.teal, border: 'none', borderRadius: 10, padding: '8px 16px', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Icon name="plus" size={14} color="#fff" />
               Nueva venta
             </button>
           </div>
 
-          {/* Contenido centrado con max-width */}
-          <div style={{ maxWidth:960, margin:'0 auto', padding:'0 24px 40px' }}>
+          <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px 40px' }}>
             {renderScreen()}
           </div>
         </main>
@@ -210,9 +190,9 @@ export default function App() {
     )
   }
 
-  // ── MOBILE LAYOUT ─────────────────────────────────────────────
+  // ── MOBILE LAYOUT ────────────────────────────────────────────
   return (
-    <div style={{ maxWidth:480, margin:'0 auto', position:'relative', minHeight:'100vh' }}>
+    <div style={{ maxWidth: 480, margin: '0 auto', position: 'relative', minHeight: '100vh' }}>
       {renderScreen()}
       {NAV_SCREENS.includes(screen) && (
         <BottomNav current={screen} onChange={tabChange} />

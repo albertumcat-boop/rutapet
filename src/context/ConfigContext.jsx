@@ -1,6 +1,6 @@
 /**
- * ConfigContext.jsx — Contexto de configuración por tenant
- * Auditado: race conditions, cleanup, manejo de errores
+ * ConfigContext.jsx — Contexto de configuración multi-empresa
+ * Soporta: usuario individual (tenantId=uid) y equipo (empresaId)
  */
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { auth } from '../../firebase/firebase.config'
@@ -12,7 +12,7 @@ import { setupUsuarioNuevo } from '../services/setupFirestore'
 const DEFAULT_CONFIG = {
   empresa: {
     nombre: '',
-    rubro:  '',
+    rubro:  'veterinaria',
     logo:   null,
     moneda: 'USD',
   },
@@ -24,9 +24,11 @@ const DEFAULT_CONFIG = {
 const ConfigContext = createContext(null)
 
 export function ConfigProvider({ children }) {
-  const [config,   setConfig]   = useState(DEFAULT_CONFIG)
-  const [tenantId, setTenantId] = useState(null)
-  const [loading,  setLoading]  = useState(true)
+  const [config,    setConfig]    = useState(DEFAULT_CONFIG)
+  const [tenantId,  setTenantId]  = useState(null)
+  const [userRole,  setUserRole]  = useState(null)   // 'admin' | 'vendedor' | null
+  const [empresaId, setEmpresaId] = useState(null)   // null = solo, uid = empresa
+  const [loading,   setLoading]   = useState(true)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -38,25 +40,49 @@ export function ConfigProvider({ children }) {
       if (!user) {
         setConfig(DEFAULT_CONFIG)
         setTenantId(null)
+        setUserRole(null)
+        setEmpresaId(null)
         setLoading(false)
         return
       }
 
       try {
-        // Setup automático si es primera vez
         const { tenantId: tid } = await setupUsuarioNuevo(user)
         if (!mountedRef.current) return
-
         setTenantId(tid)
 
-        // Cargar config desde Firestore
-        const configSnap = await getDoc(doc(db, 'config', tid))
+        // Obtener datos del usuario para rol y empresaId
+        const userSnap = await getDoc(doc(db, 'usuarios', user.uid))
+        if (!mountedRef.current) return
+
+        let rol       = null
+        let empId     = null
+        let configId  = tid  // por defecto config = uid propio
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data()
+          rol   = userData.rol       || null
+          empId = userData.empresaId || null
+
+          // Si el usuario es vendedor de una empresa, cargar config de la empresa
+          if (rol === 'vendedor' && empId) {
+            configId = empId
+          }
+        }
+
+        if (mountedRef.current) {
+          setUserRole(rol)
+          setEmpresaId(empId)
+        }
+
+        // Cargar config desde Firestore (del tenant o empresa)
+        const configSnap = await getDoc(doc(db, 'config', configId))
         if (!mountedRef.current) return
 
         if (configSnap.exists()) {
           const data = configSnap.data()
           setConfig({
-            empresa: data.empresa || DEFAULT_CONFIG.empresa,
+            empresa:            data.empresa            || DEFAULT_CONFIG.empresa,
             tiposCliente:       Array.isArray(data.tiposCliente)       ? data.tiposCliente       : [],
             categoriasProducto: Array.isArray(data.categoriasProducto) ? data.categoriasProducto : [],
             onboardingCompleto: Boolean(data.onboardingCompleto),
@@ -78,10 +104,17 @@ export function ConfigProvider({ children }) {
     }
   }, [])
 
+  const getConfigId = () => {
+    // Admin y solo-user: guardan en su propio uid
+    // Vendedor: guarda en empresaId
+    if (userRole === 'vendedor' && empresaId) return empresaId
+    return tenantId
+  }
+
   const guardarEnFirestore = async (newConfig, tid) => {
-    const id = tid || tenantId
+    const id = tid || getConfigId()
     if (!id) {
-      console.error('guardarEnFirestore: sin tenantId')
+      console.error('guardarEnFirestore: sin configId')
       return
     }
     await setDoc(doc(db, 'config', id), {
@@ -117,10 +150,15 @@ export function ConfigProvider({ children }) {
     await guardarEnFirestore(empty)
   }
 
+  const isAdmin = userRole === 'admin' || (!userRole && !empresaId)
+
   return (
     <ConfigContext.Provider value={{
       config,
       tenantId,
+      userRole,
+      empresaId,
+      isAdmin,
       loading,
       completarOnboarding,
       updateEmpresa,
