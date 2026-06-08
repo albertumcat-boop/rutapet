@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { C, estadoPagoInfo, metodoPagoLabel } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
+import { useToast } from '../../context/ToastContext'
 import { registrarPago } from '../../services/firestore'
 import { fmtUSD, clientesConDeuda, sumDeuda, fmtFecha } from '../../utils/helpers'
 import Icon from '../shared/Icon'
@@ -16,6 +17,7 @@ import TopBar from '../shared/TopBar'
 
 export default function PaymentsScreen({ onBack }) {
   const { clientes, ventas, recargar } = useAppData()
+  const toast = useToast()
 
   const [tab,    setTab]    = useState('deudas')
   const [modal,  setModal]  = useState(null)
@@ -43,8 +45,9 @@ export default function PaymentsScreen({ onBack }) {
 
     setSaving(true)
     try {
-      await registrarPago(modal.id, montoNum, modal.deuda || 0)
+      await registrarPago(modal.id, montoNum, modal.deuda || 0, metodo, ref)
       recargar()
+      toast.success(`Pago de ${fmtUSD(montoNum)} registrado`)
       setPagado(true)
       setTimeout(() => {
         setModal(null)

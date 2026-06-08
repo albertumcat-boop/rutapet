@@ -25,7 +25,7 @@ const COLORES = [
 ]
 
 const RUBROS = [
-  'Productos de mascotas','Alimentos y bebidas','Farmacia / Medicina',
+  'Medicamentos veterinarios','Productos de mascotas','Alimentos y bebidas','Farmacia / Medicina',
   'Repuestos y cauchos','Ferretería','Cosméticos','Tecnología',
   'Ropa y calzado','Material de oficina','Otro',
 ]
@@ -36,24 +36,27 @@ export default function OnboardingScreen() {
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
 
-  // Paso 1
+  // Paso 1 — pre-cargado con valores veterinarios
   const [nombre,      setNombre]      = useState('')
-  const [rubro,       setRubro]       = useState('')
+  const [rubro,       setRubro]       = useState('Medicamentos veterinarios')
   const [rubroCustom, setRubroCustom] = useState('')
   const [moneda,      setMoneda]      = useState('USD')
 
-  // Paso 2
+  // Paso 2 — tipos de cliente veterinarios
   const [tipos, setTipos] = useState([
-    { key:'t1', label:'', icon:'users',    color:'#3B82F6' },
-    { key:'t2', label:'', icon:'shopping', color:'#0FBCAA' },
-    { key:'t3', label:'', icon:'pkg',      color:'#22C55E' },
+    { key:'t1', label:'Clínica Veterinaria', icon:'users',    color:'#3B82F6' },
+    { key:'t2', label:'Farmacia / Petshop',  icon:'shopping', color:'#0FBCAA' },
+    { key:'t3', label:'Distribuidor',        icon:'truck',    color:'#22C55E' },
+    { key:'t4', label:'Granja / Productor',  icon:'pkg',      color:'#F5A623' },
   ])
 
-  // Paso 3
+  // Paso 3 — categorías de medicamentos veterinarios
   const [cats, setCats] = useState([
-    { key:'c1', label:'', icon:'pkg',      color:'#22C55E' },
-    { key:'c2', label:'', icon:'pill',     color:'#EF4444' },
-    { key:'c3', label:'', icon:'shopping', color:'#A78BFA' },
+    { key:'c1', label:'Antibióticos',      icon:'pill',      color:'#EF4444' },
+    { key:'c2', label:'Antiparasitarios',  icon:'shield',    color:'#22C55E' },
+    { key:'c3', label:'Vacunas',           icon:'syringe',   color:'#3B82F6' },
+    { key:'c4', label:'Vitaminas / Supl.', icon:'capsule',   color:'#F5A623' },
+    { key:'c5', label:'Dermatología',      icon:'heart',     color:'#EC4899' },
   ])
 
   const updTipo = (i,k,v) => setTipos(ts => ts.map((t,j) => j===i ? {...t,[k]:v} : t))
@@ -148,7 +151,7 @@ export default function OnboardingScreen() {
         {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:28 }}>
           <div style={{ width:64, height:64, borderRadius:18, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px', boxShadow:`0 8px 32px ${C.teal}55` }}>
-            <Icon name="route" size={32} color="#fff" />
+            <Icon name="paw" size={32} color="#fff" />
           </div>
           <h1 style={{ fontSize:24, fontWeight:900, color:'#fff', margin:0 }}>Configura tu app</h1>
           <p style={{ fontSize:13, color:C.gray400, marginTop:4 }}>

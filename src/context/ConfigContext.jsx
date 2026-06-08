@@ -19,6 +19,7 @@ const DEFAULT_CONFIG = {
   tiposCliente:       [],
   categoriasProducto: [],
   onboardingCompleto: false,
+  comisionPct:        5,   // % de comisión por defecto
 }
 
 const ConfigContext = createContext(null)
@@ -86,6 +87,7 @@ export function ConfigProvider({ children }) {
             tiposCliente:       Array.isArray(data.tiposCliente)       ? data.tiposCliente       : [],
             categoriasProducto: Array.isArray(data.categoriasProducto) ? data.categoriasProducto : [],
             onboardingCompleto: Boolean(data.onboardingCompleto),
+            comisionPct:        data.comisionPct !== undefined ? Number(data.comisionPct) : 5,
           })
         } else {
           setConfig(DEFAULT_CONFIG)
@@ -150,6 +152,13 @@ export function ConfigProvider({ children }) {
     await guardarEnFirestore(empty)
   }
 
+  // Actualizar campos sueltos en la config (ej: comisionPct)
+  const actualizarConfig = async (partial) => {
+    const newConfig = { ...config, ...partial }
+    setConfig(newConfig)
+    await guardarEnFirestore(newConfig)
+  }
+
   const isAdmin = userRole === 'admin' || (!userRole && !empresaId)
 
   return (
@@ -163,6 +172,7 @@ export function ConfigProvider({ children }) {
       completarOnboarding,
       updateEmpresa,
       resetConfig,
+      actualizarConfig,
     }}>
       {children}
     </ConfigContext.Provider>

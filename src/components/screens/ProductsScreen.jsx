@@ -37,6 +37,7 @@ const EMPTY_FORM = {
   nombre: '', categoria: '', marca: '', precio: '', stock: '', stockMinimo: '', descripcion: '',
   principioActivo: '', concentracion: '', presentacion: '', unidad: 'unidad', lote: '',
   fechaVencimiento: '', registroSanitario: '', cadenaFrio: false, requiereReceta: false, esMedicamento: true,
+  precios: {}, // { [tipoKey]: precio }
 }
 
 export default function ProductsScreen({ onBack, nav }) {
@@ -95,6 +96,7 @@ export default function ProductsScreen({ onBack, nav }) {
         cadenaFrio:       Boolean(p.cadenaFrio),
         requiereReceta:   Boolean(p.requiereReceta),
         esMedicamento:    p.esMedicamento !== false,
+        precios:          p.precios         || {},
       })
     } else {
       setEditId(null)
@@ -129,6 +131,7 @@ export default function ProductsScreen({ onBack, nav }) {
         cadenaFrio:       form.cadenaFrio,
         requiereReceta:   form.requiereReceta,
         esMedicamento:    form.esMedicamento,
+        precios:          form.precios || {},
       }
       if (editId) {
         await actualizarProducto(editId, payload)
@@ -312,7 +315,7 @@ export default function ProductsScreen({ onBack, nav }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
                 <div style={{ background: C.gray50, borderRadius: 12, padding: '10px', textAlign: 'center' }}>
                   <p style={{ fontSize: 18, fontWeight: 900, color: C.teal, margin: 0 }}>{fmtUSD(showDetail.precio)}</p>
-                  <p style={{ fontSize: 10, color: C.gray400, margin: 0 }}>Precio</p>
+                  <p style={{ fontSize: 10, color: C.gray400, margin: 0 }}>Precio base</p>
                 </div>
                 <div style={{ background: C.gray50, borderRadius: 12, padding: '10px', textAlign: 'center' }}>
                   <p style={{ fontSize: 18, fontWeight: 900, color: (showDetail.stock || 0) <= (showDetail.stockMinimo || 5) ? C.red : C.gray800, margin: 0 }}>{showDetail.stock || 0}</p>
@@ -323,6 +326,21 @@ export default function ProductsScreen({ onBack, nav }) {
                   <p style={{ fontSize: 10, color: C.gray400, margin: 0 }}>Mín.</p>
                 </div>
               </div>
+
+              {/* Precios por tipo de cliente */}
+              {showDetail.precios && Object.keys(showDetail.precios).some(k => showDetail.precios[k]) && (
+                <div style={{ background: C.gray50, borderRadius: 12, padding: '10px 14px', marginBottom: 14, border: `1px solid ${C.gray200}` }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: C.gray600, margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Icon name="tag" size={12} color={C.teal} /> Lista de precios
+                  </p>
+                  {config.tiposCliente?.filter(t => showDetail.precios[t.key]).map(t => (
+                    <div key={t.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                      <span style={{ fontSize: 12, color: t.color || C.gray400, fontWeight: 600 }}>{t.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: C.gray800 }}>{fmtUSD(showDetail.precios[t.key])}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Badges */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -428,7 +446,7 @@ export default function ProductsScreen({ onBack, nav }) {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 4 }}>Precio *</label>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 4 }}>Precio base *</label>
                       <input type="number" min="0" step="0.01" value={form.precio} onChange={e => upd('precio', e.target.value)}
                         placeholder="0.00"
                         style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }} />
@@ -441,6 +459,38 @@ export default function ProductsScreen({ onBack, nav }) {
                       </select>
                     </div>
                   </div>
+
+                  {/* Precios por tipo de cliente */}
+                  {config.tiposCliente?.length > 0 && (
+                    <div style={{ background: C.gray50, borderRadius: 14, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.gray200}` }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: C.gray600, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="tag" size={13} color={C.teal} />
+                        Precios por tipo de cliente (opcional)
+                      </p>
+                      <p style={{ fontSize: 11, color: C.gray400, margin: '0 0 10px' }}>
+                        Deja en blanco para usar el precio base
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {config.tiposCliente.map(tipo => (
+                          <div key={tipo.key}>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: tipo.color || C.gray600, display: 'block', marginBottom: 3 }}>
+                              {tipo.label}
+                            </label>
+                            <input
+                              type="number" min="0" step="0.01"
+                              value={form.precios?.[tipo.key] ?? ''}
+                              onChange={e => {
+                                const val = e.target.value
+                                upd('precios', { ...form.precios, [tipo.key]: val === '' ? undefined : val })
+                              }}
+                              placeholder={form.precio || '0.00'}
+                              style={{ width: '100%', padding: '8px 10px', borderRadius: 10, border: `1.5px solid ${C.gray200}`, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                     <div>

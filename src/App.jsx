@@ -28,6 +28,7 @@ import AdminScreen         from './components/screens/AdminScreen'
 import AboutScreen         from './components/screens/AboutScreen'
 import ExpiryScreen        from './components/screens/ExpiryScreen'
 import TeamScreen          from './components/screens/TeamScreen'
+import CommissionsScreen   from './components/screens/CommissionsScreen'
 import { C } from './constants/colors'
 
 const NAV_SCREENS = ['dashboard', 'clients', 'map', 'analytics', 'more']
@@ -149,6 +150,7 @@ export default function App() {
       case 'about':        return <AboutScreen        onBack={goBack} />
       case 'expiry':       return <ExpiryScreen       onBack={goBack} />
       case 'team':         return <TeamScreen         onBack={goBack} />
+      case 'commissions':  return <CommissionsScreen  onBack={goBack} />
       default:             return <DashboardScreen    nav={nav} />
     }
   }

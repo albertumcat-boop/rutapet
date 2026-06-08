@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { key: 'payments',  icon: 'card',        label: 'Cobros'          },
   { key: 'routes',    icon: 'route',       label: 'Rutas'           },
   { key: 'visits',    icon: 'calendar',    label: 'Visitas'         },
+  { key: 'commissions',icon: 'trending_up', label: 'Comisiones'      },
   { key: 'team',      icon: 'team',        label: 'Mi equipo',      adminOnly: true },
   { key: 'admin',     icon: 'settings',    label: 'Configuración'   },
 ]

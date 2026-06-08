@@ -14,13 +14,15 @@ import Badge from '../shared/Badge'
 import Avatar from '../shared/Avatar'
 
 const MENU = [
-  { icon:'plus',     label:'Nueva venta',     sub:'Registrar pedido',        color:'#0FBCAA', screen:'addSale'  },
-  { icon:'pkg',      label:'Catálogo',         sub:'Productos y precios',     color:'#22C55E', screen:'products' },
-  { icon:'card',     label:'Cobros',           sub:'Control de deudas',       color:'#EF4444', screen:'payments' },
-  { icon:'route',    label:'Rutas',            sub:'Planificar visitas',       color:'#F5A623', screen:'routes'   },
-  { icon:'calendar', label:'Visitas',          sub:'Historial y registro',    color:'#3B82F6', screen:'visits'   },
-  { icon:'settings', label:'Administración',   sub:'Panel de control',        color:'#A78BFA', screen:'admin'    },
-  { icon:'activity', label:'Acerca de',        sub:'Info de la app',          color:'#94A3B8', screen:'about'    },
+  { icon:'plus',        label:'Nueva venta',     sub:'Registrar pedido',         color:'#0FBCAA', screen:'addSale'     },
+  { icon:'pill',        label:'Catálogo',         sub:'Medicamentos y precios',   color:'#22C55E', screen:'products'    },
+  { icon:'clock',       label:'Vencimientos',     sub:'Control de fechas',        color:'#EF4444', screen:'expiry'      },
+  { icon:'card',        label:'Cobros',           sub:'Control de deudas',        color:'#F5A623', screen:'payments'    },
+  { icon:'trending_up', label:'Comisiones',       sub:'Reporte mensual',          color:'#8B5CF6', screen:'commissions' },
+  { icon:'route',       label:'Rutas',            sub:'Planificar visitas',       color:'#3B82F6', screen:'routes'      },
+  { icon:'calendar',    label:'Visitas',          sub:'Historial y registro',     color:'#14B8A6', screen:'visits'      },
+  { icon:'settings',    label:'Administración',   sub:'Panel de control',         color:'#A78BFA', screen:'admin'       },
+  { icon:'activity',    label:'Acerca de',        sub:'Info de la app',           color:'#94A3B8', screen:'about'       },
 ]
 
 export default function MoreScreen({ nav, onLogout }) {

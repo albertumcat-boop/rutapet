@@ -2,9 +2,10 @@
  * AddSaleScreen.jsx — Registro de ventas
  * Auditado: validaciones, Firebase, estado
  */
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { C } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
+import { useConfig } from '../../context/ConfigContext'
 import { agregarVenta } from '../../services/firestore'
 import { fmtUSD } from '../../utils/helpers'
 import Icon from '../shared/Icon'
@@ -27,6 +28,7 @@ const ESTADOS_PAGO = [
 
 export default function AddSaleScreen({ onBack, initCId }) {
   const { clientes, productos, recargar } = useAppData()
+  const { config } = useConfig()
 
   const [cId,          setCId]         = useState(initCId || '')
   const [items,        setItems]        = useState([{ pId: '', qty: 1 }])
@@ -44,10 +46,24 @@ export default function AddSaleScreen({ onBack, initCId }) {
 
   const itemsValidos = items.filter(it => it.pId && it.qty > 0)
 
+  // Precio aplicable según tipo de cliente
+  const clienteSeleccionado = useMemo(() => clientes.find(c => c.id === cId), [clientes, cId])
+  const getPrecio = (producto) => {
+    if (!producto) return 0
+    const tipoKey = clienteSeleccionado?.tipo
+    if (tipoKey && producto.precios?.[tipoKey]) {
+      return Number(producto.precios[tipoKey]) || Number(producto.precio) || 0
+    }
+    return Number(producto.precio) || 0
+  }
+
   const total = itemsValidos.reduce((s, it) => {
     const p = productos.find(x => x.id === it.pId)
-    return s + (p ? (Number(p.precio) || 0) * (Number(it.qty) || 0) : 0)
+    return s + getPrecio(p) * (Number(it.qty) || 0)
   }, 0)
+
+  // Tipo del cliente seleccionado para mostrar la lista aplicada
+  const tipoLabel = config.tiposCliente?.find(t => t.key === clienteSeleccionado?.tipo)?.label
 
   const handleSave = async () => {
     setError('')
@@ -63,7 +79,7 @@ export default function AddSaleScreen({ onBack, initCId }) {
         items:      itemsValidos.map(it => ({
           pId:    it.pId,
           qty:    Number(it.qty),
-          precio: Number(productos.find(p => p.id === it.pId)?.precio || 0),
+          precio: getPrecio(productos.find(p => p.id === it.pId)),
         })),
         total,
         montoPagado: mPagado,
@@ -132,7 +148,7 @@ export default function AddSaleScreen({ onBack, initCId }) {
                     <option value="">Seleccionar producto...</option>
                     {productos.map(pr => (
                       <option key={pr.id} value={pr.id}>
-                        {pr.nombre} — {fmtUSD(pr.precio)}
+                        {pr.nombre} — {fmtUSD(getPrecio(pr))}
                       </option>
                     ))}
                   </select>
@@ -151,7 +167,7 @@ export default function AddSaleScreen({ onBack, initCId }) {
                       </button>
                     </div>
                     <span style={{ fontSize:14, fontWeight:800, color:C.teal }}>
-                      {p ? fmtUSD(Number(p.precio) * Number(it.qty)) : '$0.00'}
+                      {p ? fmtUSD(getPrecio(p) * Number(it.qty)) : '$0.00'}
                     </span>
                   </div>
                 </div>
@@ -225,8 +241,13 @@ export default function AddSaleScreen({ onBack, initCId }) {
         <div style={{ background:C.navy, borderRadius:16, padding:'16px', marginBottom:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
             <span style={{ fontSize:13, color:C.gray400 }}>Total</span>
+            {tipoLabel && (
+              <p style={{ fontSize:11, color:C.teal, margin:'2px 0 0', fontWeight:700 }}>
+                Lista: {tipoLabel}
+              </p>
+            )}
             {itemsValidos.length < items.length && (
-              <p style={{ fontSize:11, color:C.amber, margin:'2px 0 0' }}>
+              <p style={{ fontSize:11, color:'#EAB308', margin:'2px 0 0' }}>
                 {items.length - itemsValidos.length} producto(s) sin seleccionar
               </p>
             )}

@@ -2,9 +2,11 @@
  * AdminScreen.jsx — Panel de administración
  * Auditado: datos reales, sin vendedores demo
  */
+import { useState } from 'react'
 import { C } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
+import { useToast } from '../../context/ToastContext'
 import { fmtUSD, sumVentas, sumDeuda, iniciales } from '../../utils/helpers'
 import { auth } from '../../../firebase/firebase.config'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -13,10 +15,14 @@ import Card from '../shared/Card'
 import Avatar from '../shared/Avatar'
 import KpiCard from '../shared/KpiCard'
 import TopBar from '../shared/TopBar'
+import Button from '../shared/Button'
 
 export default function AdminScreen({ onBack }) {
   const { clientes, ventas, productos, visitas, inventario } = useAppData()
-  const { config, resetConfig } = useConfig()
+  const { config, resetConfig, actualizarConfig } = useConfig()
+  const toast = useToast()
+  const [editComision, setEditComision] = useState(false)
+  const [pctInput,     setPctInput]     = useState(String(config.comisionPct || 5))
 
   const user   = auth.currentUser
   const nombre = user?.displayName || user?.email?.split('@')[0] || 'Admin'
@@ -47,6 +53,21 @@ export default function AdminScreen({ onBack }) {
   const handleReconfigurar = () => {
     if (confirm('¿Reconfigurar la app? Se borrarán los tipos de cliente y categorías personalizadas.')) {
       resetConfig()
+    }
+  }
+
+  const handleGuardarComision = async () => {
+    const pct = parseFloat(pctInput)
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      toast.warning('Ingresa un porcentaje entre 0 y 100')
+      return
+    }
+    try {
+      await actualizarConfig({ comisionPct: pct })
+      toast.success(`Comisión actualizada: ${pct}%`)
+      setEditComision(false)
+    } catch (err) {
+      toast.error('Error al guardar: ' + err.message)
     }
   }
 
@@ -168,6 +189,38 @@ export default function AdminScreen({ onBack }) {
                 ))}
               </div>
             </>
+          )}
+        </Card>
+
+        {/* Comisiones */}
+        <Card>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: editComision ? 14 : 0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <Icon name="trending_up" size={15} color='#8B5CF6' />
+              <div>
+                <p style={{ fontSize:13, fontWeight:700, color:C.gray800, margin:0 }}>Comisión por ventas</p>
+                <p style={{ fontSize:11, color:C.gray400, margin:0 }}>
+                  Tasa actual: <strong style={{ color:'#8B5CF6' }}>{config.comisionPct || 5}%</strong>
+                </p>
+              </div>
+            </div>
+            <button onClick={() => { setEditComision(e => !e); setPctInput(String(config.comisionPct || 5)) }}
+              style={{ background:C.gray100, border:'none', borderRadius:10, padding:'6px 12px', fontSize:11, fontWeight:700, color:C.gray600, cursor:'pointer', fontFamily:'inherit' }}>
+              {editComision ? 'Cancelar' : 'Editar'}
+            </button>
+          </div>
+          {editComision && (
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <input
+                type="number" min="0" max="100" step="0.5"
+                value={pctInput}
+                onChange={e => setPctInput(e.target.value)}
+                placeholder="5"
+                style={{ flex:1, padding:'10px', borderRadius:10, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit' }}
+              />
+              <span style={{ fontSize:13, color:C.gray600 }}>%</span>
+              <Button size="sm" icon="ok_circle" onClick={handleGuardarComision}>Guardar</Button>
+            </div>
           )}
         </Card>
 
