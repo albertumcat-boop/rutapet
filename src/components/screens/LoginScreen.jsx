@@ -111,10 +111,10 @@ export default function LoginScreen({ onLogin, onVolver }) {
         {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:36 }}>
           <div style={{ width:76, height:76, borderRadius:22, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', boxShadow:`0 8px 40px ${C.teal}55` }}>
-            <Icon name="route" size={38} color="#fff" />
+            <Icon name="paw" size={38} color="#fff" />
           </div>
-          <h1 style={{ fontSize:30, fontWeight:900, color:'#fff', margin:0, letterSpacing:-1 }}>RutaVentas</h1>
-          <p style={{ fontSize:13, color:C.gray400, marginTop:6 }}>Gestión de ventas en ruta</p>
+          <h1 style={{ fontSize:30, fontWeight:900, color:'#fff', margin:0, letterSpacing:-1 }}>VetRuta</h1>
+          <p style={{ fontSize:13, color:C.gray400, marginTop:6 }}>Ventas de medicamentos veterinarios</p>
         </div>
 
         {/* Card */}

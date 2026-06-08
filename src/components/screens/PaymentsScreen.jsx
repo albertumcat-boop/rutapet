@@ -2,11 +2,11 @@
  * PaymentsScreen.jsx — Cobros y pagos
  * Auditado: registrarPago conectado a Firebase, recarga datos
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { C, estadoPagoInfo, metodoPagoLabel } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useToast } from '../../context/ToastContext'
-import { registrarPago } from '../../services/firestore'
+import { registrarPago, obtenerPagos } from '../../services/firestore'
 import { fmtUSD, clientesConDeuda, sumDeuda, fmtFecha } from '../../utils/helpers'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
@@ -16,10 +16,34 @@ import Button from '../shared/Button'
 import TopBar from '../shared/TopBar'
 
 export default function PaymentsScreen({ onBack }) {
-  const { clientes, ventas, recargar } = useAppData()
+  const { clientes, recargar } = useAppData()
   const toast = useToast()
+  const [pagosHist, setPagosHist] = useState([])
+  const [loadingPagos, setLoadingPagos] = useState(false)
+
+  // Cargar historial real de pagos cuando se activa la pestaña
+  const cargarPagos = async () => {
+    setLoadingPagos(true)
+    try {
+      const datos = await obtenerPagos()
+      // Ordenar por fecha descendente
+      datos.sort((a, b) => {
+        const fa = a.fecha?.toDate?.() || new Date(a.fecha || 0)
+        const fb = b.fecha?.toDate?.() || new Date(b.fecha || 0)
+        return fb - fa
+      })
+      setPagosHist(datos)
+    } catch (err) {
+      console.error('cargarPagos:', err)
+    } finally {
+      setLoadingPagos(false)
+    }
+  }
 
   const [tab,    setTab]    = useState('deudas')
+
+  // Cargar pagos al montar
+  useEffect(() => { cargarPagos() }, [])
   const [modal,  setModal]  = useState(null)
   const [monto,  setMonto]  = useState('')
   const [metodo, setMetodo] = useState('efectivo')
@@ -143,30 +167,43 @@ export default function PaymentsScreen({ onBack }) {
           ))
         )}
 
-        {/* HISTORIAL */}
+        {/* HISTORIAL DE PAGOS REALES */}
         {tab === 'historial' && (
-          ventas.length === 0 ? (
+          loadingPagos ? (
             <div style={{ textAlign:'center', padding:'30px 0' }}>
-              <Icon name="activity" size={32} color={C.gray400} />
-              <p style={{ fontSize:13, color:C.gray400, marginTop:10 }}>Sin ventas registradas</p>
+              <span style={{ width:28, height:28, border:`3px solid ${C.teal}`, borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />
             </div>
-          ) : ventas.map(v => {
-            const cl = clientes.find(c => c.id === v.clienteId)
-            const ep = estadoPagoInfo(v.estado)
+          ) : pagosHist.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'30px 0' }}>
+              <Icon name="card" size={32} color={C.gray400} />
+              <p style={{ fontSize:13, color:C.gray400, marginTop:10 }}>Sin pagos registrados todavía</p>
+            </div>
+          ) : pagosHist.map(p => {
+            const cl = clientes.find(c => c.id === p.clienteId)
             return (
-              <Card key={v.id}>
+              <Card key={p.id}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div style={{ minWidth:0, flex:1 }}>
-                    <p style={{ fontSize:13, fontWeight:700, color:C.gray800, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {cl?.nombre || 'Cliente eliminado'}
-                    </p>
-                    <p style={{ fontSize:11, color:C.gray400, margin:'2px 0' }}>
-                      {fmtFecha(v.fecha)} · {metodoPagoLabel(v.metodoPago)}
-                    </p>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
+                    <div style={{ width:36, height:36, borderRadius:10, background:'#DCFCE7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <Icon name="ok_circle" size={18} color={C.green} />
+                    </div>
+                    <div style={{ minWidth:0 }}>
+                      <p style={{ fontSize:13, fontWeight:700, color:C.gray800, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {cl?.nombre || 'Cliente'}
+                      </p>
+                      <p style={{ fontSize:11, color:C.gray400, margin:'2px 0' }}>
+                        {fmtFecha(p.fecha)} · {metodoPagoLabel(p.metodoPago)}
+                      </p>
+                      {p.referencia && (
+                        <p style={{ fontSize:10, color:C.teal, margin:0 }}>Ref: {p.referencia}</p>
+                      )}
+                    </div>
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0, marginLeft:8 }}>
-                    <p style={{ fontSize:14, fontWeight:800, color:C.gray800, margin:0 }}>{fmtUSD(v.total)}</p>
-                    <Badge bg={ep.bg} txt={ep.txt}>{ep.label}</Badge>
+                    <p style={{ fontSize:15, fontWeight:900, color:C.green, margin:0 }}>+{fmtUSD(p.monto)}</p>
+                    <p style={{ fontSize:10, color:C.gray400, margin:'2px 0 0' }}>
+                      Saldo: {fmtUSD(p.deudaDespues)}
+                    </p>
                   </div>
                 </div>
               </Card>

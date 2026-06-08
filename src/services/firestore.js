@@ -301,6 +301,23 @@ export const agregarVenta = async (data) => {
     ultimaVisita: serverTimestamp(),
   })
 
+  // Descontar stock de cada producto vendido
+  for (const item of (data.items || [])) {
+    if (!item.pId || !item.qty) continue
+    try {
+      const prodSnap = await getDoc(docRef('productos', item.pId))
+      if (prodSnap.exists()) {
+        const stockActual = prodSnap.data().stock || 0
+        const nuevoStock  = Math.max(0, stockActual - Number(item.qty))
+        await updateDoc(docRef('productos', item.pId), {
+          stock: nuevoStock, actualizadoEn: serverTimestamp(),
+        })
+      }
+    } catch (err) {
+      console.warn(`No se pudo descontar stock de ${item.pId}:`, err)
+    }
+  }
+
   // FIX: Solo agregar a deuda el monto que quedó sin pagar
   if (estado === 'pendiente' || estado === 'parcial') {
     const clienteSnap = await getDoc(docRef('clientes', data.clienteId))
@@ -407,6 +424,25 @@ export const eliminarRuta = async (id) => {
   requireAuth()
   if (!id) throw new Error('ID de ruta requerido')
   await deleteDoc(docRef('rutas', id))
+}
+
+// ── QUERIES POR VENDEDOR (para vistas de admin) ───────────────
+export const obtenerClientesPorVendedor = async (vendedorId) => {
+  const q    = query(col('clientes'), where('vendedorId', '==', vendedorId))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.activo !== false)
+}
+
+export const obtenerVentasPorVendedor = async (vendedorId) => {
+  const q    = query(col('ventas'), where('vendedorId', '==', vendedorId))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export const obtenerVisitasPorVendedor = async (vendedorId) => {
+  const q    = query(col('visitas'), where('vendedorId', '==', vendedorId))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
 // ── COBROS / PAGOS ────────────────────────────────────

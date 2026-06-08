@@ -11,6 +11,7 @@ import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import KpiCard from '../shared/KpiCard'
 import TopBar from '../shared/TopBar'
+import { exportarVentas, exportarClientesConDeuda, exportarInventario } from '../../utils/csvExport'
 
 export default function AnalyticsScreen({ onBack }) {
   const { clientes, ventas, productos, visitas, loading } = useAppData()
@@ -108,6 +109,24 @@ export default function AnalyticsScreen({ onBack }) {
         <div className="kpi-grid">
           <KpiCard label="Clientes"        val={clientes.length}   icon="users"    color="#3B82F6" />
           <KpiCard label="Conversión"      val={`${conversion}%`} icon="target"   color={C.green} />
+        </div>
+
+        {/* Exportar CSV */}
+        <div style={{ marginBottom:16 }}>
+          <p style={{ fontSize:12, fontWeight:700, color:C.gray600, marginBottom:8 }}>Exportar datos</p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {[
+              { label:'Ventas',    fn: () => exportarVentas(ventas, clientes, productos),         icon:'download' },
+              { label:'Deudas',    fn: () => exportarClientesConDeuda(clientes),                   icon:'download' },
+              { label:'Inventario',fn: () => exportarInventario(productos),                        icon:'download' },
+            ].map(btn => (
+              <button key={btn.label} onClick={btn.fn}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:10, border:`1.5px solid ${C.teal}`, background:`${C.teal}10`, color:C.teal, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                <Icon name={btn.icon} size={14} color={C.teal} />
+                {btn.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {sinDatos ? (

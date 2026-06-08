@@ -2,7 +2,7 @@
  * AddSaleScreen.jsx — Registro de ventas
  * Fase 3: Descuentos + Nota de Entrega PDF
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { C } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
@@ -34,6 +34,9 @@ export default function AddSaleScreen({ onBack, initCId }) {
   const user = auth.currentUser
 
   const [cId,         setCId]        = useState(initCId || '')
+  const [busqCliente, setBusqCliente] = useState('')
+  const [showClDrop,  setShowClDrop]  = useState(false)
+  const clInputRef = useRef(null)
   const [items,       setItems]      = useState([{ pId: '', qty: 1 }])
   const [metodo,      setMetodo]     = useState('efectivo')
   const [estado,      setEstado]     = useState('pagado')
@@ -53,6 +56,16 @@ export default function AddSaleScreen({ onBack, initCId }) {
 
   // Precio por tipo de cliente
   const clienteSeleccionado = useMemo(() => clientes.find(c => c.id === cId), [clientes, cId])
+
+  const clientesFiltrados = useMemo(() => {
+    const q = busqCliente.toLowerCase().trim()
+    if (!q) return clientes.slice(0, 50)
+    return clientes.filter(c =>
+      c.nombre?.toLowerCase().includes(q) ||
+      c.contacto?.toLowerCase().includes(q) ||
+      c.telefono?.includes(q)
+    ).slice(0, 30)
+  }, [clientes, busqCliente])
   const getPrecio = (producto) => {
     if (!producto) return 0
     const tipoKey = clienteSeleccionado?.tipo
@@ -168,12 +181,54 @@ export default function AddSaleScreen({ onBack, initCId }) {
         <label style={{ fontSize: 13, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 6 }}>
           Cliente *
         </label>
-        <select value={cId} onChange={e => setCId(e.target.value)} style={{ ...selStyle, marginBottom: 16 }}>
-          <option value="">Seleccionar cliente...</option>
-          {clientes.map(c => (
-            <option key={c.id} value={c.id}>{c.nombre}</option>
-          ))}
-        </select>
+        <div style={{ position: 'relative', marginBottom: 16 }}>
+          {/* Si hay cliente seleccionado, mostrar chip */}
+          {cId && clienteSeleccionado ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.teal + '12', border: `1.5px solid ${C.teal}`, borderRadius: 12, padding: '10px 12px' }}>
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.teal }}>{clienteSeleccionado.nombre}</span>
+              <button onClick={() => { setCId(''); setBusqCliente(''); setTimeout(() => clInputRef.current?.focus(), 50) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                <Icon name="x_circle" size={18} color={C.teal} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ position: 'relative' }}>
+                <Icon name="search" size={16} color={C.gray400} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <input
+                  ref={clInputRef}
+                  value={busqCliente}
+                  onChange={e => { setBusqCliente(e.target.value); setShowClDrop(true) }}
+                  onFocus={() => setShowClDrop(true)}
+                  onBlur={() => setTimeout(() => setShowClDrop(false), 150)}
+                  placeholder="Buscar cliente por nombre o teléfono..."
+                  style={{ ...selStyle, paddingLeft: 34, marginBottom: 0 }}
+                />
+              </div>
+              {showClDrop && clientesFiltrados.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: `1px solid ${C.gray200}`, maxHeight: 220, overflowY: 'auto', marginTop: 4 }}>
+                  {clientesFiltrados.map(c => (
+                    <button key={c.id}
+                      onMouseDown={() => { setCId(c.id); setBusqCliente(''); setShowClDrop(false) }}
+                      style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: `1px solid ${C.gray100}`, fontFamily: 'inherit' }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: C.gray800, margin: 0 }}>{c.nombre}</p>
+                      {(c.contacto || c.telefono) && (
+                        <p style={{ fontSize: 11, color: C.gray400, margin: '2px 0 0' }}>
+                          {[c.contacto, c.telefono].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showClDrop && busqCliente && clientesFiltrados.length === 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: `1px solid ${C.gray200}`, padding: '14px', marginTop: 4, textAlign: 'center', fontSize: 13, color: C.gray400 }}>
+                  Sin resultados para "{busqCliente}"
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Indicador de lista de precio */}
         {tipoLabel && cId && (
