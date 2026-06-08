@@ -31,7 +31,8 @@ export default function AddClientScreen({ onBack }) {
   const TIPOS = config.tiposCliente || []
 
   const [form, setForm] = useState({
-    nombre:'', tipo:'', contacto:'', telefono:'', direccion:'', notas:''
+    nombre:'', tipo:'', contacto:'', telefono:'', email:'', direccion:'',
+    nivel:'medio', limiteCredito:'', condicionPago:'contado', notas:'',
   })
   const [foto,         setFoto]         = useState(null)
   const [fotoSize,     setFotoSize]     = useState(null)
@@ -146,17 +147,20 @@ export default function AddClientScreen({ onBack }) {
     setSaving(true)
     try {
       await agregarCliente({
-        nombre:    form.nombre,
-        tipo:      form.tipo || TIPOS[0]?.key || 'general',
-        contacto:  form.contacto,
-        telefono:  form.telefono,
-        direccion: form.direccion,
-        notas:     form.notas,
-        lat:       ubicacion?.lat || 10.48,
-        lng:       ubicacion?.lng || -66.87,
-        nivel:     'medio',
-        deuda:     0,
-        foto:      foto || null,
+        nombre:        form.nombre,
+        tipo:          form.tipo || TIPOS[0]?.key || 'general',
+        contacto:      form.contacto,
+        telefono:      form.telefono,
+        email:         form.email,
+        direccion:     form.direccion,
+        notas:         form.notas,
+        nivel:         form.nivel || 'medio',
+        limiteCredito: parseFloat(form.limiteCredito) || 0,
+        condicionPago: form.condicionPago || 'contado',
+        lat:           ubicacion?.lat || 10.48,
+        lng:           ubicacion?.lng || -66.87,
+        deuda:         0,
+        foto:          foto || null,
       })
       setDone(true)
       setTimeout(onBack, 1600)
@@ -238,18 +242,57 @@ export default function AddClientScreen({ onBack }) {
           )}
         </Card>
 
-        {/* Campos */}
+        {/* Campos básicos */}
         {[
-          { key:'nombre',   label:'Nombre del negocio *', placeholder:'Ej: Distribuidora García' },
-          { key:'contacto', label:'Contacto',              placeholder:'Ej: Juan García'          },
-          { key:'telefono', label:'Teléfono',              placeholder:'+58 412-XXX-XXXX'         },
+          { key:'nombre',   label:'Nombre del negocio *', placeholder:'Ej: Distribuidora García', type:'text'  },
+          { key:'contacto', label:'Contacto',              placeholder:'Ej: Juan García',          type:'text'  },
+          { key:'telefono', label:'Teléfono',              placeholder:'+58 412-XXX-XXXX',         type:'tel'   },
+          { key:'email',    label:'Correo electrónico',    placeholder:'correo@empresa.com',       type:'email' },
         ].map(f => (
           <div key={f.key} style={{ marginBottom:14 }}>
             <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>{f.label}</label>
-            <input value={form[f.key]} onChange={e => upd(f.key, e.target.value)} placeholder={f.placeholder}
+            <input type={f.type} value={form[f.key]} onChange={e => upd(f.key, e.target.value)} placeholder={f.placeholder}
               style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box' }} />
           </div>
         ))}
+
+        {/* Nivel de cliente */}
+        <div style={{ marginBottom:14 }}>
+          <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:8 }}>Nivel de cliente</label>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+            {[
+              { key:'alto',  label:'Alto',  color:'#22C55E', bg:'#DCFCE7' },
+              { key:'medio', label:'Medio', color:'#EAB308', bg:'#FEF9C3' },
+              { key:'bajo',  label:'Bajo',  color:'#EF4444', bg:'#FEE2E2' },
+            ].map(n => (
+              <button key={n.key} onClick={() => upd('nivel', n.key)}
+                style={{ padding:'10px', borderRadius:12, border:`2px solid ${form.nivel===n.key?n.color:C.gray200}`, background:form.nivel===n.key?n.bg:'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:700, color:form.nivel===n.key?n.color:C.gray600 }}>
+                {n.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Límite de crédito y condición de pago */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
+          <div>
+            <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Límite crédito ($)</label>
+            <input type="number" min="0" step="10" value={form.limiteCredito} onChange={e => upd('limiteCredito', e.target.value)}
+              placeholder="0 = sin límite"
+              style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize:13, fontWeight:700, color:C.gray600, display:'block', marginBottom:6 }}>Condición de pago</label>
+            <select value={form.condicionPago} onChange={e => upd('condicionPago', e.target.value)}
+              style={{ width:'100%', padding:'11px 12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:14, fontFamily:'inherit', boxSizing:'border-box', background:'#fff' }}>
+              <option value="contado">Contado</option>
+              <option value="15 días">15 días</option>
+              <option value="30 días">30 días</option>
+              <option value="45 días">45 días</option>
+              <option value="60 días">60 días</option>
+            </select>
+          </div>
+        </div>
 
         {/* Dirección + GPS */}
         <div style={{ marginBottom:14 }}>

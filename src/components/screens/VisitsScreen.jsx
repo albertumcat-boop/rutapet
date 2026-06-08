@@ -2,7 +2,7 @@
  * VisitsScreen.jsx — Historial y registro de visitas
  * Fase 3: Firma digital en registro + PDF reporte de visita
  */
-import { useState } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { C } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
@@ -35,8 +35,20 @@ export default function VisitsScreen({ nav, onBack }) {
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
   const [detalle,    setDetalle]    = useState(null)  // visita seleccionada para detalle
+  const [busqVisita, setBusqVisita] = useState('')
+  const [showVisDrop, setShowVisDrop] = useState(false)
+  const visInputRef = useRef(null)
 
   const pendientes = clientes.filter(c => daysSince(c.ultimaVisita) > 20)
+
+  const clienteSelVisita = useMemo(() => clientes.find(c => c.id === clienteId), [clientes, clienteId])
+  const clientesFiltradosVisita = useMemo(() => {
+    const q = busqVisita.toLowerCase().trim()
+    if (!q) return clientes.slice(0, 50)
+    return clientes.filter(c =>
+      c.nombre?.toLowerCase().includes(q) || c.telefono?.includes(q)
+    ).slice(0, 30)
+  }, [clientes, busqVisita])
 
   const conversion = visitas.length > 0
     ? Math.round((visitas.filter(v => v.vendio).length / visitas.length) * 100)
@@ -257,15 +269,48 @@ export default function VisitsScreen({ nav, onBack }) {
                   </button>
                 </div>
 
-                {/* Cliente */}
+                {/* Cliente — búsqueda */}
                 <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 6 }}>
                   Cliente *
                 </label>
-                <select value={clienteId} onChange={e => setClienteId(e.target.value)}
-                  style={{ width: '100%', padding: '11px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 14 }}>
-                  <option value="">Seleccionar cliente...</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
+                <div style={{ position: 'relative', marginBottom: 14 }}>
+                  {clienteId && clienteSelVisita ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.teal + '12', border: `1.5px solid ${C.teal}`, borderRadius: 12, padding: '10px 12px' }}>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.teal }}>{clienteSelVisita.nombre}</span>
+                      <button onClick={() => { setClienteId(''); setBusqVisita(''); setTimeout(() => visInputRef.current?.focus(), 50) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                        <Icon name="x_circle" size={18} color={C.teal} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ position: 'relative' }}>
+                        <Icon name="search" size={15} color={C.gray400} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                        <input
+                          ref={visInputRef}
+                          value={busqVisita}
+                          onChange={e => { setBusqVisita(e.target.value); setShowVisDrop(true) }}
+                          onFocus={() => setShowVisDrop(true)}
+                          onBlur={() => setTimeout(() => setShowVisDrop(false), 150)}
+                          placeholder="Buscar cliente..."
+                          style={{ width: '100%', padding: '11px 11px 11px 32px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      {showVisDrop && clientesFiltradosVisita.length > 0 && (
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', border: `1px solid ${C.gray200}`, maxHeight: 180, overflowY: 'auto', marginTop: 3 }}>
+                          {clientesFiltradosVisita.map(c => (
+                            <button key={c.id}
+                              onMouseDown={() => { setClienteId(c.id); setBusqVisita(''); setShowVisDrop(false) }}
+                              style={{ width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: `1px solid ${C.gray100}`, fontFamily: 'inherit' }}>
+                              <p style={{ fontSize: 13, fontWeight: 700, color: C.gray800, margin: 0 }}>{c.nombre}</p>
+                              {c.telefono && <p style={{ fontSize: 11, color: C.gray400, margin: 0 }}>{c.telefono}</p>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
 
                 {/* Resultado */}
                 <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 8 }}>

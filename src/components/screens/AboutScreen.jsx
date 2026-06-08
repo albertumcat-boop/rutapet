@@ -48,9 +48,9 @@ export default function AboutScreen({ onBack }) {
       {/* Hero */}
       <div style={{ background:C.navy, padding:'24px 20px 32px', textAlign:'center' }}>
         <div style={{ width:80, height:80, borderRadius:24, background:C.teal, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:`0 8px 32px ${C.teal}55` }}>
-          <Icon name="route" size={40} color="#fff" />
+          <Icon name="paw" size={40} color="#fff" />
         </div>
-        <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:0 }}>RutaVentas</h1>
+        <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:0 }}>VetRuta</h1>
         <p style={{ fontSize:13, color:C.gray400, margin:'6px 0 12px' }}>
           {config.empresa?.nombre || 'Gestión de ventas en ruta'}
         </p>
@@ -122,7 +122,7 @@ export default function AboutScreen({ onBack }) {
 
         <div style={{ textAlign:'center', padding:'8px 0 16px' }}>
           <p style={{ fontSize:12, color:C.gray400 }}>React · Firebase · OpenStreetMap · Vite</p>
-          <p style={{ fontSize:12, color:C.gray400, marginTop:4 }}>© 2025 RutaVentas · Todos los derechos reservados</p>
+          <p style={{ fontSize:12, color:C.gray400, marginTop:4 }}>© 2025 VetRuta · Todos los derechos reservados</p>
         </div>
       </div>
 

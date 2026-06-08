@@ -17,7 +17,7 @@ import KpiCard from '../shared/KpiCard'
 import TopBar from '../shared/TopBar'
 import Button from '../shared/Button'
 
-export default function AdminScreen({ onBack }) {
+export default function AdminScreen({ onBack, nav }) {
   const { clientes, ventas, productos, visitas, inventario } = useAppData()
   const { config, resetConfig, actualizarConfig } = useConfig()
   const toast = useToast()
@@ -223,6 +223,29 @@ export default function AdminScreen({ onBack }) {
             </div>
           )}
         </Card>
+
+        {/* Acceso rápido — admin */}
+        {nav && (
+          <Card>
+            <p style={{ fontSize:12, fontWeight:700, color:C.gray600, marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>Accesos rápidos</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[
+                { icon:'team',        label:'Equipo',       color:'#6366F1', screen:'team'        },
+                { icon:'trending_up', label:'Comisiones',   color:'#8B5CF6', screen:'commissions' },
+                { icon:'activity',    label:'Analítica',    color:C.teal,    screen:'analytics'   },
+                { icon:'card',        label:'Cobros',       color:'#F5A623', screen:'payments'    },
+              ].map(a => (
+                <button key={a.screen} onClick={() => nav(a.screen)}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'12px', borderRadius:12, border:`1.5px solid ${C.gray200}`, background:'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+                  <div style={{ width:34, height:34, borderRadius:10, background:a.color+'15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <Icon name={a.icon} size={17} color={a.color} />
+                  </div>
+                  <span style={{ fontSize:12, fontWeight:700, color:C.gray800 }}>{a.label}</span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Estado del sistema */}
         <div style={{ background:C.navy, borderRadius:16, padding:16 }}>

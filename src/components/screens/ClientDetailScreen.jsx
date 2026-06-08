@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { C, nivelBg, nivelTxt, estadoPagoInfo, metodoPagoLabel } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
-import { actualizarCliente, eliminarCliente, setInventarioProducto, calcularPorcentajeInventario, colorPorcentaje, labelPorcentaje } from '../../services/firestore'
+import { actualizarCliente, eliminarCliente, actualizarVenta, setInventarioProducto, calcularPorcentajeInventario, colorPorcentaje, labelPorcentaje } from '../../services/firestore'
 import { fmtUSD, daysSince, fmtFecha } from '../../utils/helpers'
 import { imprimirRemision } from '../../utils/pdfPrint'
 import Icon from '../shared/Icon'
@@ -22,6 +22,7 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
   const [form,     setForm]     = useState({})
   const [editInv,  setEditInv]  = useState(false)
   const [invForm,  setInvForm]  = useState({})
+  const [markingPaid, setMarkingPaid] = useState(null) // ventaId being marked
 
   const c = clientes.find(cl => cl.id === cliente?.id) || cliente
 
@@ -83,6 +84,25 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
       alert('Error: ' + err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleMarcarPagado = async (venta) => {
+    if (markingPaid) return
+    const pendiente = Math.max(0, (venta.total || 0) - (venta.montoPagado || 0))
+    if (!confirm(`¿Marcar como pagado? Se acreditarán ${fmtUSD(pendiente)} a la cuenta del cliente.`)) return
+    setMarkingPaid(venta.id)
+    try {
+      // Actualizar estado de la venta
+      await actualizarVenta(venta.id, { estado: 'pagado', montoPagado: venta.total })
+      // Reducir deuda del cliente
+      const nuevaDeuda = Math.max(0, (c.deuda || 0) - pendiente)
+      await actualizarCliente(c.id, { deuda: nuevaDeuda })
+      recargar()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setMarkingPaid(null)
     }
   }
 
@@ -431,11 +451,21 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
                       </div>
                       <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
                         <Badge bg={ep.bg} txt={ep.txt}>{ep.label}</Badge>
-                        <button
-                          onClick={() => imprimirRemision({ venta:v, cliente:c, productos, empresa:config.empresa, descuento:v.descuento||0 })}
-                          style={{ background:'none', border:`1px solid ${C.gray200}`, borderRadius:8, padding:'3px 8px', fontSize:10, fontWeight:700, color:C.gray600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:3 }}>
-                          <Icon name="download" size={11} color={C.gray400} /> PDF
-                        </button>
+                        <div style={{ display:'flex', gap:4 }}>
+                          {(v.estado === 'pendiente' || v.estado === 'parcial') && (
+                            <button
+                              onClick={() => handleMarcarPagado(v)}
+                              disabled={markingPaid === v.id}
+                              style={{ background:'#DCFCE7', border:'none', borderRadius:8, padding:'3px 8px', fontSize:10, fontWeight:700, color:'#166534', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:3 }}>
+                              <Icon name="ok_circle" size={11} color="#166534" /> Pagar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => imprimirRemision({ venta:v, cliente:c, productos, empresa:config.empresa, descuento:v.descuento||0 })}
+                            style={{ background:'none', border:`1px solid ${C.gray200}`, borderRadius:8, padding:'3px 8px', fontSize:10, fontWeight:700, color:C.gray600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:3 }}>
+                            <Icon name="download" size={11} color={C.gray400} /> PDF
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </Card>

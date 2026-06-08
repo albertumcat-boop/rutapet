@@ -198,6 +198,18 @@ export const eliminarCliente = async (id) => {
 // ── PRODUCTOS (con campos de medicamentos) ─────────────
 export const agregarProducto = async (data) => {
   requireAuth()
+  // Usar el tenantId del admin si es vendedor
+  let tenantId = uid()
+  try {
+    const userSnap = await getDoc(docRef('usuarios', uid()))
+    if (userSnap.exists()) {
+      const userData = userSnap.data()
+      if (userData.rol === 'vendedor' && userData.empresaId) {
+        tenantId = userData.empresaId
+      }
+    }
+  } catch {}
+
   return await addDoc(col('productos'), {
     // Campos base
     nombre:          data.nombre          || '',
@@ -219,8 +231,9 @@ export const agregarProducto = async (data) => {
     cadenaFrio:      Boolean(data.cadenaFrio),
     requiereReceta:  Boolean(data.requiereReceta),
     esMedicamento:   Boolean(data.esMedicamento),
+    precios:         data.precios || {},   // { [tipoClienteKey]: precio }
 
-    tenantId:        uid(),
+    tenantId,
     activo:          true,
     creadoEn:        serverTimestamp(),
   })
@@ -228,7 +241,19 @@ export const agregarProducto = async (data) => {
 
 export const obtenerProductos = async () => {
   requireAuth()
-  const q    = query(col('productos'), where('tenantId', '==', uid()))
+  // Si el usuario es vendedor de una empresa, usa el tenantId del admin (empresaId)
+  let tenantId = uid()
+  try {
+    const userSnap = await getDoc(docRef('usuarios', uid()))
+    if (userSnap.exists()) {
+      const userData = userSnap.data()
+      if (userData.rol === 'vendedor' && userData.empresaId) {
+        tenantId = userData.empresaId
+      }
+    }
+  } catch {}
+
+  const q    = query(col('productos'), where('tenantId', '==', tenantId))
   const snap = await getDocs(q)
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))

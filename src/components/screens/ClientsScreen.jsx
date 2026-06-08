@@ -4,6 +4,7 @@ import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
 import { calcularPorcentajeInventario, colorPorcentaje } from '../../services/firestore'
 import { fmtUSD, daysSince } from '../../utils/helpers'
+import { exportarClientes } from '../../utils/csvExport'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Badge from '../shared/Badge'
@@ -48,7 +49,13 @@ export default function ClientsScreen({ nav }) {
       <div style={{ background:C.navy, padding:'20px 14px 14px', color:'#fff' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
           <h1 style={{ fontSize:20, fontWeight:900, margin:0 }}>Clientes</h1>
-          <Button icon="plus" size="sm" onClick={() => nav('addClient')}>Nuevo</Button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => exportarClientes(clientes)}
+              style={{ background:'#ffffff15', border:'none', borderRadius:10, padding:'6px 10px', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
+              <Icon name="download" size={13} color="#fff" /> CSV
+            </button>
+            <Button icon="plus" size="sm" onClick={() => nav('addClient')}>Nuevo</Button>
+          </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', background:'#ffffff20', borderRadius:12, padding:'8px 12px', gap:8, marginBottom:10 }}>
           <Icon name="search" size={16} color={C.gray400} />

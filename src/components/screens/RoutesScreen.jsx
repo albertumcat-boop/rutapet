@@ -11,13 +11,14 @@ import TopBar from '../shared/TopBar'
 export default function RoutesScreen({ onBack }) {
   const { clientes, rutas: rutasFirebase, recargar } = useAppData()
   const [rutas,     setRutas]     = useState([])
-  const [open,      setOpen]      = useState(null)
-  const [showForm,  setShowForm]  = useState(false)
-  const [nombre,    setNombre]    = useState('')
-  const [fecha,     setFecha]     = useState(new Date().toISOString().split('T')[0])
-  const [selCls,    setSelCls]    = useState([])
-  const [guardado,  setGuardado]  = useState(false)
-  const [saving,    setSaving]    = useState(false)
+  const [open,        setOpen]        = useState(null)
+  const [showForm,    setShowForm]    = useState(false)
+  const [nombre,      setNombre]      = useState('')
+  const [fecha,       setFecha]       = useState(new Date().toISOString().split('T')[0])
+  const [selCls,      setSelCls]      = useState([])
+  const [guardado,    setGuardado]    = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [busqRuta,    setBusqRuta]    = useState('')
 
   useEffect(() => { setRutas(rutasFirebase) }, [rutasFirebase])
 
@@ -231,11 +232,24 @@ export default function RoutesScreen({ onBack }) {
                   Selecciona clientes ({selCls.length} seleccionados)
                 </label>
 
+                {/* Búsqueda de clientes */}
+                <div style={{ position:'relative', marginBottom:10 }}>
+                  <Icon name="search" size={15} color={C.gray400} style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} />
+                  <input
+                    value={busqRuta}
+                    onChange={e => setBusqRuta(e.target.value)}
+                    placeholder="Buscar cliente..."
+                    style={{ width:'100%', padding:'10px 10px 10px 34px', borderRadius:12, border:`1.5px solid ${C.gray200}`, fontSize:13, fontFamily:'inherit', boxSizing:'border-box' }}
+                  />
+                </div>
+
                 {clientes.length === 0 ? (
                   <p style={{ fontSize:13, color:C.gray400, textAlign:'center', padding:'16px 0' }}>
                     No tienes clientes aún.
                   </p>
-                ) : clientes.map(c => (
+                ) : clientes
+                    .filter(c => !busqRuta || c.nombre?.toLowerCase().includes(busqRuta.toLowerCase()) || c.direccion?.toLowerCase().includes(busqRuta.toLowerCase()))
+                    .map(c => (
                   <div key={c.id} onClick={() => toggleCliente(c.id)}
                     style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, marginBottom:6, cursor:'pointer', background:selCls.includes(c.id)?C.teal+'10':'#F8FAFC', border:`1.5px solid ${selCls.includes(c.id)?C.teal:'#E2E8F0'}` }}>
                     <div style={{ width:20, height:20, borderRadius:6, border:`2px solid ${selCls.includes(c.id)?C.teal:'#E2E8F0'}`, background:selCls.includes(c.id)?C.teal:'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>

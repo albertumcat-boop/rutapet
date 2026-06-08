@@ -146,7 +146,7 @@ export default function App() {
       case 'routes':       return <RoutesScreen       onBack={goBack} />
       case 'visits':       return <VisitsScreen       nav={nav} onBack={goBack} />
       case 'more':         return <MoreScreen         nav={nav} onLogout={handleLogout} />
-      case 'admin':        return <AdminScreen        onBack={goBack} />
+      case 'admin':        return <AdminScreen        onBack={goBack} nav={nav} />
       case 'about':        return <AboutScreen        onBack={goBack} />
       case 'expiry':       return <ExpiryScreen       onBack={goBack} />
       case 'team':         return <TeamScreen         onBack={goBack} />

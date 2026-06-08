@@ -71,6 +71,7 @@ export default function PaymentsScreen({ onBack }) {
     try {
       await registrarPago(modal.id, montoNum, modal.deuda || 0, metodo, ref)
       recargar()
+      cargarPagos()
       toast.success(`Pago de ${fmtUSD(montoNum)} registrado`)
       setPagado(true)
       setTimeout(() => {

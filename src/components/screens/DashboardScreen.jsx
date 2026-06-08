@@ -57,6 +57,16 @@ export default function DashboardScreen({ nav }) {
     [clientes]
   )
 
+  // Productos con stock bajo
+  const stockBajo = useMemo(() =>
+    productos.filter(p => {
+      const s = Number(p.stock) || 0
+      const min = Number(p.stockMinimo) || 0
+      return min > 0 ? s <= min : s === 0
+    }).sort((a, b) => (Number(a.stock)||0) - (Number(b.stock)||0)),
+    [productos]
+  )
+
   // Todas las notificaciones
   const notificaciones = useMemo(() => [
     ...yaVencidos.map(p => ({
@@ -109,6 +119,16 @@ export default function DashboardScreen({ nav }) {
       onClick: () => { setShowNotif(false); nav('payments') },
       urgente: false,
     })),
+    ...stockBajo.map(p => ({
+      id:      `stock-${p.id}`,
+      icon:    'pkg',
+      color:   '#F97316',
+      bg:      '#FFF7ED',
+      titulo:  `Stock bajo: ${p.nombre}`,
+      desc:    `${Number(p.stock)||0} unidades${p.stockMinimo ? ` (mín. ${p.stockMinimo})` : ''}`,
+      onClick: () => { setShowNotif(false); nav('products') },
+      urgente: (Number(p.stock)||0) === 0,
+    })),
     ...rutas.filter(r => r.estado === 'pendiente').map(r => ({
       id:      `ruta-${r.id}`,
       icon:    'route',
@@ -119,7 +139,7 @@ export default function DashboardScreen({ nav }) {
       onClick: () => { setShowNotif(false); nav('routes') },
       urgente: false,
     })),
-  ], [yaVencidos, vencen30, sobreLimite, inact, conDeuda, rutas])
+  ], [yaVencidos, vencen30, sobreLimite, stockBajo, inact, conDeuda, rutas])
 
   const urgentes = notificaciones.filter(n => n.urgente).length
 
@@ -237,9 +257,9 @@ export default function DashboardScreen({ nav }) {
         </div>
         <div className="kpi-grid">
           <KpiCard label="Clientes"        val={clientes.length} sub={`${inact.length} inactivos`}    icon="users"  color="#3B82F6" />
-          <KpiCard label="Por vencer"      val={porVencer.length}
-            sub={yaVencidos.length > 0 ? `${yaVencidos.length} vencidos 🚨` : `${vencen30.length} en 30 días`}
-            icon="clock"  color={yaVencidos.length > 0 ? C.red : C.amber} />
+          <KpiCard label="Stock bajo"       val={stockBajo.length}
+            sub={stockBajo.filter(p=>(Number(p.stock)||0)===0).length > 0 ? `${stockBajo.filter(p=>(Number(p.stock)||0)===0).length} agotados 🚨` : `${porVencer.length} por vencer`}
+            icon="pkg"    color={stockBajo.filter(p=>(Number(p.stock)||0)===0).length > 0 ? C.red : '#F97316'} />
         </div>
       </div>
 
@@ -311,6 +331,33 @@ export default function DashboardScreen({ nav }) {
               <Icon name="chevron" size={13} color={C.red} />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Stock bajo */}
+      {stockBajo.length > 0 && (
+        <div style={{ padding: '0 14px 14px' }}>
+          <p style={{ fontSize: 13, fontWeight: 800, color: '#9A3412', marginBottom: 8 }}>
+            📦 {stockBajo.filter(p=>(Number(p.stock)||0)===0).length > 0 ? 'Productos agotados / stock bajo' : 'Stock bajo'}
+          </p>
+          {stockBajo.slice(0, 3).map(p => {
+            const agotado = (Number(p.stock)||0) === 0
+            return (
+              <div key={p.id} onClick={() => nav('products')}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, background: agotado ? '#FEE2E2' : '#FFF7ED', borderRadius: 12, padding: '10px 12px', marginBottom: 6, border: `1px solid ${agotado ? '#FCA5A5' : '#FDBA74'}`, cursor: 'pointer' }}>
+                <Icon name="pkg" size={16} color={agotado ? C.red : '#F97316'} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: agotado ? '#991B1B' : '#9A3412', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.nombre}
+                  </p>
+                  <p style={{ fontSize: 11, color: agotado ? '#991B1B' : '#C2410C', margin: 0, opacity: 0.85 }}>
+                    {agotado ? 'SIN STOCK' : `${Number(p.stock)} uds`}{p.stockMinimo ? ` · mín. ${p.stockMinimo}` : ''}
+                  </p>
+                </div>
+                <Icon name="chevron" size={13} color={agotado ? C.red : '#F97316'} />
+              </div>
+            )
+          })}
         </div>
       )}
 

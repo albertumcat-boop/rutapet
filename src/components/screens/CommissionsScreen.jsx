@@ -32,9 +32,15 @@ function ventasDelMes(ventas, mes, anio) {
 }
 
 export default function CommissionsScreen({ onBack }) {
-  const { ventas, loading }  = useAppData()
-  const { config, isAdmin }  = useConfig()
+  const { ventas, equipo, loading } = useAppData()
+  const { config, isAdmin }         = useConfig()
   const user = auth.currentUser
+
+  const getNombreVendedor = (vendedorId) => {
+    if (vendedorId === user?.uid) return 'Tú'
+    const miembro = equipo?.find(m => m.id === vendedorId)
+    return miembro?.nombre || miembro?.email?.split('@')[0] || `Vendedor ${vendedorId.slice(-4)}`
+  }
 
   const { mes: mesHoy, anio: anioHoy } = getMesActual()
   const [mes,  setMes]  = useState(mesHoy)
@@ -133,9 +139,7 @@ export default function CommissionsScreen({ onBack }) {
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 13, fontWeight: 700, color: C.gray800, margin: 0 }}>
-                      {isAdmin
-                        ? (fila.vendedorId === user?.uid ? 'Tú (Admin)' : `Vendedor ${fila.vendedorId.slice(-6)}`)
-                        : 'Mi comisión'}
+                      {isAdmin ? getNombreVendedor(fila.vendedorId) : 'Mi comisión'}
                     </p>
                     <p style={{ fontSize: 11, color: C.gray400, margin: '2px 0 0' }}>
                       {fila.ventas.length} venta{fila.ventas.length !== 1 ? 's' : ''} · {pctComision}% de comisión

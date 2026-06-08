@@ -51,7 +51,7 @@ const ICONS = {
   file:       <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
 
   // ── Médico-veterinarios ─────────────────────────────────────────────
-  pill:       <><path d="M10.5 20H4a2 2 0 01-2-2V6a2 2 0 012-2h16a2 2 0 012 2v7.5"/><path d="M16 19h6"/><path d="M19 16v6"/></>,
+  pill:       <><path d="M10.5 21.5l-8-8a5 5 0 017-7l8 8a5 5 0 01-7 7z"/><path d="M7.5 12.5l5 5"/></>,
   // Cápsula (medicamento)
   capsule:    <><path d="M7.5 3.5a5 5 0 000 10L16.5 3.5a5 5 0 00-9 0z"/><path d="M7.5 13.5a5 5 0 009 0L7.5 3.5"/></>,
   // Jeringa / vacuna
@@ -77,7 +77,7 @@ const ICONS = {
   // Usuarios / equipo
   team:       <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></>,
   // Crown / admin
-  crown:      <><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></>,
+  crown:      <><path d="M2 20h20M6 20l2-8 4 4 4-8 4 4 2 8"/><circle cx="6" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="6" r="1" fill="currentColor"/><circle cx="12" cy="14" r="1" fill="currentColor"/></>,
   // Persona individual
   person:     <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
   // Receta / prescripción

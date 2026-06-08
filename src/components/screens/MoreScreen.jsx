@@ -13,26 +13,14 @@ import Card from '../shared/Card'
 import Badge from '../shared/Badge'
 import Avatar from '../shared/Avatar'
 
-const MENU = [
-  { icon:'plus',        label:'Nueva venta',     sub:'Registrar pedido',         color:'#0FBCAA', screen:'addSale'     },
-  { icon:'pill',        label:'Catálogo',         sub:'Medicamentos y precios',   color:'#22C55E', screen:'products'    },
-  { icon:'clock',       label:'Vencimientos',     sub:'Control de fechas',        color:'#EF4444', screen:'expiry'      },
-  { icon:'card',        label:'Cobros',           sub:'Control de deudas',        color:'#F5A623', screen:'payments'    },
-  { icon:'trending_up', label:'Comisiones',       sub:'Reporte mensual',          color:'#8B5CF6', screen:'commissions' },
-  { icon:'route',       label:'Rutas',            sub:'Planificar visitas',       color:'#3B82F6', screen:'routes'      },
-  { icon:'calendar',    label:'Visitas',          sub:'Historial y registro',     color:'#14B8A6', screen:'visits'      },
-  { icon:'settings',    label:'Administración',   sub:'Panel de control',         color:'#A78BFA', screen:'admin'       },
-  { icon:'activity',    label:'Acerca de',        sub:'Info de la app',           color:'#94A3B8', screen:'about'       },
-]
-
 export default function MoreScreen({ nav, onLogout }) {
   const { clientes, ventas }  = useAppData()
-  const { config }            = useConfig()
+  const { config, isAdmin }   = useConfig()
   const user                  = auth.currentUser
   const nombre                = user?.displayName || user?.email?.split('@')[0] || 'Usuario'
   const avatar                = iniciales(nombre)
   const total                 = sumVentas(ventas)
-  const empresa               = config.empresa?.nombre || 'RutaVentas'
+  const empresa               = config.empresa?.nombre || 'VetRuta'
 
   return (
     <div className="screen-enter" style={{ background:C.gray50, minHeight:'100vh' }}>
@@ -66,7 +54,18 @@ export default function MoreScreen({ nav, onLogout }) {
       </div>
 
       <div style={{ padding:14 }}>
-        {MENU.map((item,i) => (
+        {[
+          { icon:'plus',        label:'Nueva venta',     sub:'Registrar pedido',         color:'#0FBCAA', screen:'addSale',     adminOnly:false },
+          { icon:'pill',        label:'Catálogo',         sub:'Medicamentos y precios',   color:'#22C55E', screen:'products',    adminOnly:false },
+          { icon:'clock',       label:'Vencimientos',     sub:'Control de fechas',        color:'#EF4444', screen:'expiry',      adminOnly:false },
+          { icon:'card',        label:'Cobros',           sub:'Control de deudas',        color:'#F5A623', screen:'payments',    adminOnly:false },
+          { icon:'trending_up', label:'Comisiones',       sub:'Reporte mensual',          color:'#8B5CF6', screen:'commissions', adminOnly:false },
+          { icon:'route',       label:'Rutas',            sub:'Planificar visitas',       color:'#3B82F6', screen:'routes',      adminOnly:false },
+          { icon:'calendar',    label:'Visitas',          sub:'Historial y registro',     color:'#14B8A6', screen:'visits',      adminOnly:false },
+          { icon:'team',        label:'Equipo',           sub:'Gestionar vendedores',     color:'#6366F1', screen:'team',        adminOnly:true  },
+          { icon:'settings',    label:'Administración',   sub:'Panel de control',         color:'#A78BFA', screen:'admin',       adminOnly:false },
+          { icon:'activity',    label:'Acerca de',        sub:'Info de la app',           color:'#94A3B8', screen:'about',       adminOnly:false },
+        ].filter(item => !item.adminOnly || isAdmin).map((item,i) => (
           <Card key={i} onClick={() => nav(item.screen)}>
             <div style={{ display:'flex', alignItems:'center', gap:14 }}>
               <div style={{ width:44, height:44, borderRadius:14, background:item.color+'15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
