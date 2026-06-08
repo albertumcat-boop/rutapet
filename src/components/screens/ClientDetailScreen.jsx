@@ -3,7 +3,8 @@ import { C, nivelBg, nivelTxt, estadoPagoInfo, metodoPagoLabel } from '../../con
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
 import { actualizarCliente, eliminarCliente, setInventarioProducto, calcularPorcentajeInventario, colorPorcentaje, labelPorcentaje } from '../../services/firestore'
-import { fmtUSD, daysSince } from '../../utils/helpers'
+import { fmtUSD, daysSince, fmtFecha } from '../../utils/helpers'
+import { imprimirRemision } from '../../utils/pdfPrint'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Badge from '../shared/Badge'
@@ -417,13 +418,25 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
                   <Card key={v.id}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <div>
-                        <p style={{ fontSize:15, fontWeight:800, color:C.gray800, margin:0 }}>{fmtUSD(v.total)}</p>
+                        <p style={{ fontSize:15, fontWeight:800, color:C.gray800, margin:0 }}>
+                          {fmtUSD(v.total)}
+                          {v.descuento > 0 && (
+                            <span style={{ fontSize:11, color:C.red, marginLeft:6 }}>(-{v.descuento}%)</span>
+                          )}
+                        </p>
                         <p style={{ fontSize:12, color:C.gray400, margin:'2px 0' }}>
-                          {v.fecha?.toDate ? v.fecha.toDate().toLocaleDateString('es-VE') : ''} · {metodoPagoLabel(v.metodoPago)}
+                          {fmtFecha(v.fecha)} · {metodoPagoLabel(v.metodoPago)}
                         </p>
                         <p style={{ fontSize:12, color:C.gray600, margin:0 }}>{v.items?.length||0} producto(s)</p>
                       </div>
-                      <Badge bg={ep.bg} txt={ep.txt}>{ep.label}</Badge>
+                      <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
+                        <Badge bg={ep.bg} txt={ep.txt}>{ep.label}</Badge>
+                        <button
+                          onClick={() => imprimirRemision({ venta:v, cliente:c, productos, empresa:config.empresa, descuento:v.descuento||0 })}
+                          style={{ background:'none', border:`1px solid ${C.gray200}`, borderRadius:8, padding:'3px 8px', fontSize:10, fontWeight:700, color:C.gray600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:3 }}>
+                          <Icon name="download" size={11} color={C.gray400} /> PDF
+                        </button>
+                      </div>
                     </div>
                   </Card>
                 )

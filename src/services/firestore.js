@@ -279,17 +279,21 @@ export const agregarVenta = async (data) => {
   const estado      = data.estado || 'pendiente'
 
   const ref = await addDoc(col('ventas'), {
-    clienteId:   data.clienteId,
-    items:       data.items     || [],
-    total:       Number(data.total),
-    montoPagado: montoPagado,
-    metodoPago:  data.metodoPago || 'efectivo',
+    clienteId:      data.clienteId,
+    items:          data.items       || [],
+    subtotal:       Number(data.subtotal || data.total),
+    descuento:      Number(data.descuento)  || 0,   // porcentaje
+    descValor:      Number(data.descValor)  || 0,   // monto descontado
+    total:          Number(data.total),
+    montoPagado:    montoPagado,
+    metodoPago:     data.metodoPago  || 'efectivo',
     estado,
-    notas:       data.notas     || '',
-    vendedorId:  uid(),
-    tenantId:    uid(),
-    fecha:       serverTimestamp(),
-    creadoEn:    serverTimestamp(),
+    notas:          data.notas       || '',
+    vendedorNombre: data.vendedorNombre || '',
+    vendedorId:     uid(),
+    tenantId:       uid(),
+    fecha:          serverTimestamp(),
+    creadoEn:       serverTimestamp(),
   })
 
   // Actualizar última visita del cliente
@@ -344,7 +348,7 @@ export const agregarVisita = async (data) => {
     clienteId:  data.clienteId,
     vendio:     data.vendio !== undefined ? data.vendio : false,
     notas:      data.notas      || '',
-    firma:      data.firma      || null,
+    firma:      data.firma      || null,   // base64 PNG de firma digital
     vendedorId: uid(),
     tenantId:   uid(),
     fecha:      serverTimestamp(),
