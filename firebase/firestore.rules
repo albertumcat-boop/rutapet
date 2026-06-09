@@ -52,6 +52,27 @@ service cloud.firestore {
                .affectedKeys().hasAny(['vendedorId', 'tenantId']);
     }
 
+    // ── Validaciones anti-abuso ────────────────────────────────
+
+    // Los campos de texto no deben exceder tamaños razonables
+    // (previene inyección de payloads masivos en Firestore)
+    function camposTextoValidos(d) {
+      return (!d.keys().hasAll(['notas'])      || d.notas.size()     <= 2000)
+          && (!d.keys().hasAll(['nombre'])     || d.nombre.size()    <= 200)
+          && (!d.keys().hasAll(['descripcion'])|| d.descripcion.size()<= 1000)
+          && (!d.keys().hasAll(['referencia']) || d.referencia.size()<= 500);
+    }
+
+    // Un documento nuevo debe tener un timestamp de creación reciente
+    // (dentro de ±5 min del servidor, previene backdating)
+    function timestampValido() {
+      let d = request.resource.data;
+      return !d.keys().hasAll(['creadoEn']) ||
+        (d.creadoEn is timestamp &&
+         d.creadoEn >= request.time - duration.value(300, 's') &&
+         d.creadoEn <= request.time + duration.value(60,  's'));
+    }
+
     // ── USUARIOS ──────────────────────────────────────────────
     match /usuarios/{userId} {
       // Propio doc, o admin leyendo a uno de sus vendedores
@@ -88,8 +109,8 @@ service cloud.firestore {
         resource.data.vendedorId == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
       );
-      allow create: if isAuth() && validNewDoc();
-      allow update: if isAuth() && identityUnchanged() && (
+      allow create: if isAuth() && validNewDoc() && camposTextoValidos(request.resource.data);
+      allow update: if isAuth() && identityUnchanged() && camposTextoValidos(request.resource.data) && (
         resource.data.vendedorId == uid() ||
         resource.data.tenantId   == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
@@ -123,7 +144,7 @@ service cloud.firestore {
         resource.data.tenantId   == uid() ||
         resource.data.vendedorId == uid()
       );
-      allow create: if isAuth() && validNewDoc();
+      allow create: if isAuth() && validNewDoc() && camposTextoValidos(request.resource.data) && timestampValido();
       // Admin puede actualizar cualquier campo de ventas de su empresa
       // Vendedor puede actualizar sus propias ventas PERO NO campos financieros críticos
       allow update: if isAuth() && (

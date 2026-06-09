@@ -29,6 +29,8 @@ import AboutScreen         from './components/screens/AboutScreen'
 import ExpiryScreen        from './components/screens/ExpiryScreen'
 import TeamScreen          from './components/screens/TeamScreen'
 import CommissionsScreen   from './components/screens/CommissionsScreen'
+import NetworkBanner          from './components/shared/NetworkBanner'
+import { usePushNotifications } from './hooks/usePushNotifications'
 import { C } from './constants/colors'
 
 const NAV_SCREENS = ['dashboard', 'clients', 'map', 'analytics', 'more']
@@ -59,6 +61,7 @@ export default function App() {
   const { config, loading: configLoading } = useConfig()
   const toast    = useToast()
   const isDesktop = useIsDesktop()
+  usePushNotifications()
 
   const [loggedIn,    setLoggedIn]    = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
@@ -159,6 +162,7 @@ export default function App() {
   if (isDesktop) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: C.gray50 }}>
+        <NetworkBanner />
         <Sidebar current={screen} onChange={tabChange} onLogout={handleLogout} />
 
         <main style={{ flex: 1, minHeight: '100vh', overflowX: 'hidden', overflowY: 'auto', background: C.gray50 }}>
@@ -195,6 +199,7 @@ export default function App() {
   // ── MOBILE LAYOUT ────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', position: 'relative', minHeight: '100vh' }}>
+      <NetworkBanner />
       {renderScreen()}
       {NAV_SCREENS.includes(screen) && (
         <BottomNav current={screen} onChange={tabChange} />

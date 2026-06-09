@@ -7,6 +7,15 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  test: {
+    environment: 'node',
+    include:     ['src/**/*.test.js', 'tests/**/*.test.js'],
+    coverage: {
+      provider:  'v8',
+      reporter:  ['text', 'html'],
+      include:   ['src/utils/**', 'src/services/firestore.js'],
+    },
+  },
   plugins: [
     react(),
     VitePWA({

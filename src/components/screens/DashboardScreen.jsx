@@ -1,7 +1,7 @@
 /**
  * DashboardScreen.jsx — Panel principal con KPIs farmacéuticos y alertas de vencimiento
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { C, estadoPagoInfo, metodoPagoLabel } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
@@ -14,6 +14,7 @@ import KpiCard from '../shared/KpiCard'
 import Avatar from '../shared/Avatar'
 import Badge from '../shared/Badge'
 import Button from '../shared/Button'
+import { usePushNotifications } from '../../hooks/usePushNotifications'
 
 function diasParaVencer(fechaStr) {
   if (!fechaStr) return null
@@ -30,6 +31,8 @@ export default function DashboardScreen({ nav }) {
   const nombre  = user?.displayName || user?.email?.split('@')[0] || 'Usuario'
   const avatar  = nombre.slice(0, 2).toUpperCase()
   const empresa = config.empresa?.nombre || 'VetRuta'
+
+  const { notificarStockBajo } = usePushNotifications()
 
   const total    = useMemo(() => sumVentas(ventas), [ventas])
   const deuda    = useMemo(() => sumDeuda(clientes), [clientes])
@@ -66,6 +69,12 @@ export default function DashboardScreen({ nav }) {
     }).sort((a, b) => (Number(a.stock)||0) - (Number(b.stock)||0)),
     [productos]
   )
+
+  // Notificación push cuando hay stock bajo (una sola vez por sesión)
+  useEffect(() => {
+    if (stockBajo.length > 0) notificarStockBajo(stockBajo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockBajo.length])
 
   // Todas las notificaciones
   const notificaciones = useMemo(() => [
