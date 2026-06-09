@@ -157,8 +157,8 @@ export default function AddClientScreen({ onBack }) {
         nivel:         form.nivel || 'medio',
         limiteCredito: parseFloat(form.limiteCredito) || 0,
         condicionPago: form.condicionPago || 'contado',
-        lat:           ubicacion?.lat || 10.48,
-        lng:           ubicacion?.lng || -66.87,
+        lat:           ubicacion?.lat ?? null,
+        lng:           ubicacion?.lng ?? null,
         deuda:         0,
         foto:          foto || null,
       })

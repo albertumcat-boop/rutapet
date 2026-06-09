@@ -20,9 +20,10 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
   const [saving,   setSaving]   = useState(false)
   const [deleted,  setDeleted]  = useState(false)
   const [form,     setForm]     = useState({})
-  const [editInv,  setEditInv]  = useState(false)
-  const [invForm,  setInvForm]  = useState({})
-  const [markingPaid, setMarkingPaid] = useState(null) // ventaId being marked
+  const [editInv,      setEditInv]      = useState(false)
+  const [invForm,      setInvForm]      = useState({})
+  const [markingPaid,  setMarkingPaid]  = useState(null)
+  const [buscandoGPS,  setBuscandoGPS]  = useState(false)
 
   const c = clientes.find(cl => cl.id === cliente?.id) || cliente
 
@@ -68,15 +69,17 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
     setSaving(true)
     try {
       await actualizarCliente(c.id, {
-        nombre:    form.nombre,
-        contacto:  form.contacto,
-        telefono:  form.telefono,
-        direccion: form.direccion,
-        email:     form.email    || '',
-        notas:     form.notas,
-        nivel:     form.nivel,
-        tipo:      form.tipo,
+        nombre:        form.nombre,
+        contacto:      form.contacto,
+        telefono:      form.telefono,
+        direccion:     form.direccion,
+        email:         form.email    || '',
+        notas:         form.notas,
+        nivel:         form.nivel,
+        tipo:          form.tipo,
         limiteCredito: form.limiteCredito || 0,
+        lat:           form.lat ?? null,
+        lng:           form.lng ?? null,
       })
       recargar()
       setEditMode(false)
@@ -259,6 +262,41 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
               <label style={{ fontSize:12, fontWeight:700, color:C.gray600, display:'block', marginBottom:4 }}>Notas</label>
               <textarea value={form.notas||''} onChange={e => upd('notas', e.target.value)} rows={3}
                 style={{ ...inputStyle, resize:'vertical' }} />
+
+              {/* GPS */}
+              <div style={{ marginTop:14, background:C.gray50, borderRadius:12, padding:'10px 12px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:C.gray600 }}>📍 Ubicación GPS</span>
+                  <button
+                    disabled={buscandoGPS}
+                    onClick={() => {
+                      if (!navigator.geolocation) { alert('GPS no disponible'); return }
+                      setBuscandoGPS(true)
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => { upd('lat', pos.coords.latitude); upd('lng', pos.coords.longitude); setBuscandoGPS(false) },
+                        ()    => { setBuscandoGPS(false); alert('No se pudo obtener GPS') },
+                        { enableHighAccuracy:true, timeout:8000 }
+                      )
+                    }}
+                    style={{ padding:'5px 10px', borderRadius:8, border:`1.5px solid ${C.teal}`, background:`${C.teal}10`, color:C.teal, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                    {buscandoGPS ? 'Buscando...' : 'Capturar mi ubicación'}
+                  </button>
+                </div>
+                {form.lat && form.lng ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <Icon name="ok_circle" size={13} color={C.green} />
+                    <span style={{ fontSize:11, color:'#166534', fontWeight:600 }}>
+                      {Number(form.lat).toFixed(5)}, {Number(form.lng).toFixed(5)}
+                    </span>
+                    <button onClick={() => { upd('lat', null); upd('lng', null) }}
+                      style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:C.gray400, fontSize:11 }}>
+                      ✕ quitar
+                    </button>
+                  </div>
+                ) : (
+                  <span style={{ fontSize:11, color:C.gray400 }}>Sin coordenadas — no aparece en el mapa</span>
+                )}
+              </div>
             </Card>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>

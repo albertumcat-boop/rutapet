@@ -10,7 +10,6 @@ export default function MapScreen({ nav, onBack }) {
   const { clientes } = useAppData()
   const { config }   = useConfig()
 
-  const [sel,         setSel]         = useState(null)
   const [filt,        setFilt]        = useState('todos')
   const [buscandoGPS, setBuscandoGPS] = useState(false)
   const [cercanos,    setCercanos]    = useState([])
@@ -20,7 +19,9 @@ export default function MapScreen({ nav, onBack }) {
   const markersRef     = useRef([])
   const miPinRef       = useRef()
 
-  const visible = clientes.filter(c => filt === 'todos' || c.tipo === filt)
+  const visible   = clientes.filter(c => filt === 'todos' || c.tipo === filt)
+  const conGPS    = visible.filter(c => c.lat && c.lng).length
+  const sinGPS    = visible.filter(c => !c.lat || !c.lng).length
 
   // ── Obtener color y letra del tipo desde config ──────
   const getTipoColor = (key) => {
@@ -111,7 +112,7 @@ setMapReady(true)
         markersRef.current.push(marker)
       })
     })
-  }, [clientes, filt, mapReady])
+  }, [clientes, filt, mapReady, config])
 
   // ── CERCANOS A MÍ ─────────────────────────────────────
   const handleCercanos = () => {
@@ -177,20 +178,25 @@ setMapReady(true)
       <div style={{ background: C.navy, padding: '20px 14px 14px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
           <h1 style={{ fontSize:20, fontWeight:900, color:'#fff', margin:0 }}>Mapa de clientes</h1>
-          <span style={{ fontSize:13, color:C.teal, fontWeight:700 }}>{visible.length} visibles</span>
+          <div style={{ textAlign:'right' }}>
+            <span style={{ fontSize:13, color:C.teal, fontWeight:700 }}>{conGPS} en mapa</span>
+            {sinGPS > 0 && (
+              <span style={{ fontSize:11, color:'#FCA5A5', fontWeight:600, display:'block' }}>{sinGPS} sin GPS</span>
+            )}
+          </div>
         </div>
 
         {/* Filtros dinámicos desde config */}
         <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2 }}>
           <button
-            onClick={() => { setFilt('todos'); setSel(null) }}
+            onClick={() => setFilt('todos')}
             style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:filt==='todos'?C.teal:'#ffffff20', color:'#fff', border:'none', flexShrink:0 }}>
             Todos
           </button>
           {config.tiposCliente.map(t => (
             <button
               key={t.key}
-              onClick={() => { setFilt(t.key); setSel(null) }}
+              onClick={() => setFilt(t.key)}
               style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit', background:filt===t.key?t.color:'#ffffff20', color:'#fff', border:'none', flexShrink:0 }}>
               {t.label}
             </button>
@@ -220,6 +226,17 @@ setMapReady(true)
             }
           </button>
         </div>
+
+        {/* Aviso sin GPS */}
+        {sinGPS > 0 && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, background:'#FFF7ED', border:'1px solid #FDBA74', borderRadius:12, padding:'8px 12px', marginBottom:10 }}>
+            <Icon name="alert" size={15} color="#F97316" />
+            <p style={{ fontSize:12, color:'#9A3412', margin:0, flex:1 }}>
+              <b>{sinGPS} cliente{sinGPS>1?'s':''}</b> sin coordenadas GPS no aparece{sinGPS>1?'n':''} en el mapa.
+              Edítalos para añadir ubicación.
+            </p>
+          </div>
+        )}
 
         {/* Leyenda */}
         <div style={{ display:'flex', gap:14, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
