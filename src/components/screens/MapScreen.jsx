@@ -42,7 +42,7 @@ export default function MapScreen({ nav, onBack }) {
     return fecha
   }
 
-  // ── Inicializar mapa ──────────────────────────────────
+  // ── Inicializar mapa con posición real del usuario ────
   useEffect(() => {
     const init = async () => {
       const leaflet = await import('leaflet')
@@ -54,14 +54,44 @@ export default function MapScreen({ nav, onBack }) {
         shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
       if (!mapRef.current || mapInstanceRef.current) return
-      const map = L.map(mapRef.current).setView([10.48, -66.87], 12)
+
+      // Primer cliente con coords como fallback si no hay GPS
+      const primerCliente = clientes.find(c => c.lat && c.lng)
+      const fallback = primerCliente
+        ? [primerCliente.lat, primerCliente.lng]
+        : [10.48, -66.87]
+
+      // Crear mapa con fallback, luego mover a posición real si el usuario la permite
+      const map = L.map(mapRef.current).setView(fallback, 13)
       mapInstanceRef.current = map
-     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 19,
-}).addTo(map)
-setTimeout(() => map.invalidateSize(), 100)
-setMapReady(true)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map)
+      setTimeout(() => map.invalidateSize(), 100)
+      setMapReady(true)
+
+      // Intentar centrar en posición real del usuario
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude: lat, longitude: lng } = pos.coords
+            map.setView([lat, lng], 13)
+            // Poner pin "Tú estás aquí" silencioso al abrir
+            const miIcon = L.divIcon({
+              className: '',
+              html: `<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 0 0 4px #3B82F640;"></div>`,
+              iconSize: [18, 18], iconAnchor: [9, 9],
+            })
+            if (miPinRef.current) { miPinRef.current.remove() }
+            miPinRef.current = L.marker([lat, lng], { icon: miIcon })
+              .addTo(map)
+              .bindPopup('<b style="font-family:Nunito">📍 Tú estás aquí</b>')
+          },
+          () => { /* sin permiso → quedarse en fallback, sin alert */ },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+        )
+      }
     }
     init()
     return () => {
@@ -70,7 +100,7 @@ setMapReady(true)
         mapInstanceRef.current = null
       }
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Agregar/actualizar pines cuando cambian clientes o filtro ──
   useEffect(() => {
@@ -114,6 +144,21 @@ setMapReady(true)
     })
   }, [clientes, filt, mapReady, config])
 
+  // ── Helper: colocar/actualizar pin "Tú estás aquí" ───
+  const colocarMiPin = (L, map, lat, lng, abrirPopup = false) => {
+    if (miPinRef.current) { miPinRef.current.remove(); miPinRef.current = null }
+    const miIcon = L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 0 0 4px #3B82F640;"></div>`,
+      iconSize: [18, 18], iconAnchor: [9, 9],
+    })
+    const marker = L.marker([lat, lng], { icon: miIcon })
+      .addTo(map)
+      .bindPopup('<b style="font-family:Nunito">📍 Tú estás aquí</b>')
+    if (abrirPopup) marker.openPopup()
+    miPinRef.current = marker
+  }
+
   // ── CERCANOS A MÍ ─────────────────────────────────────
   const handleCercanos = () => {
     if (!navigator.geolocation) { alert('Tu dispositivo no soporta GPS'); return }
@@ -144,24 +189,15 @@ setMapReady(true)
         const map = mapInstanceRef.current
         if (map) {
           import('leaflet').then(({ default: L }) => {
-            if (miPinRef.current) { miPinRef.current.remove(); miPinRef.current = null }
-            const miIcon = L.divIcon({
-              className: '',
-              html: `<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 0 0 4px #3B82F640;"></div>`,
-              iconSize: [18,18], iconAnchor: [9,9],
-            })
-            miPinRef.current = L.marker([myLat, myLng], { icon: miIcon })
-              .addTo(map)
-              .bindPopup('<b style="font-family:Nunito">📍 Tú estás aquí</b>')
-              .openPopup()
-            map.setView([myLat, myLng], 13)
+            colocarMiPin(L, map, myLat, myLng, true)
+            map.setView([myLat, myLng], 14)
           })
         }
       },
       (err) => {
         setBuscandoGPS(false)
         const msgs = {
-          1: 'Permiso denegado. Actívalo en el navegador.',
+          1: 'Permiso denegado. Actívalo en ajustes del navegador.',
           2: 'No se pudo obtener la ubicación.',
           3: 'Tiempo de espera agotado.',
         }
