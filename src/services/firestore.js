@@ -33,7 +33,9 @@ export const obtenerUsuario = async () => {
 
 export const actualizarUsuario = async (data) => {
   requireAuth()
-  const permitidos = ['nombre','email','telefono','foto','rol','empresaId','activo']
+  // SECURITY: 'rol', 'empresaId', 'tenantId', 'uid' son campos de seguridad
+  // que NO deben ser modificables por el usuario desde el cliente
+  const permitidos = ['nombre', 'telefono', 'foto']
   const update = {}
   for (const key of permitidos) {
     if (data[key] !== undefined) update[key] = data[key]
@@ -388,10 +390,15 @@ export const obtenerVentasEmpresa = async (empresaId) => {
 export const actualizarVenta = async (id, data) => {
   requireAuth()
   if (!id) throw new Error('ID de venta requerido')
-  await updateDoc(docRef('ventas', id), {
-    ...data,
-    actualizadoEn: serverTimestamp(),
-  })
+  // SECURITY: whitelist de campos editables — no se permite cambiar total ni IDs
+  const permitidos = ['estado', 'montoPagado', 'notas', 'metodoPago', 'referencia']
+  const update = {}
+  for (const key of permitidos) {
+    if (data[key] !== undefined) update[key] = data[key]
+  }
+  if (Object.keys(update).length === 0) return
+  update.actualizadoEn = serverTimestamp()
+  await updateDoc(docRef('ventas', id), update)
 }
 
 // ── VISITAS ───────────────────────────────────────────
@@ -452,10 +459,15 @@ export const obtenerRutas = async () => {
 export const actualizarRuta = async (id, data) => {
   requireAuth()
   if (!id) throw new Error('ID de ruta requerido')
-  await updateDoc(docRef('rutas', id), {
-    ...data,
-    actualizadoEn: serverTimestamp(),
-  })
+  // SECURITY: whitelist — no se permiten cambiar vendedorId ni tenantId
+  const permitidos = ['nombre', 'clientes', 'fecha', 'estado', 'km', 'notas']
+  const update = {}
+  for (const key of permitidos) {
+    if (data[key] !== undefined) update[key] = data[key]
+  }
+  if (Object.keys(update).length === 0) return
+  update.actualizadoEn = serverTimestamp()
+  await updateDoc(docRef('rutas', id), update)
 }
 
 export const eliminarRuta = async (id) => {
@@ -466,18 +478,24 @@ export const eliminarRuta = async (id) => {
 
 // ── QUERIES POR VENDEDOR (para vistas de admin) ───────────────
 export const obtenerClientesPorVendedor = async (vendedorId) => {
+  requireAuth()
+  if (!vendedorId) return []
   const q    = query(col('clientes'), where('vendedorId', '==', vendedorId))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.activo !== false)
 }
 
 export const obtenerVentasPorVendedor = async (vendedorId) => {
+  requireAuth()
+  if (!vendedorId) return []
   const q    = query(col('ventas'), where('vendedorId', '==', vendedorId))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
 export const obtenerVisitasPorVendedor = async (vendedorId) => {
+  requireAuth()
+  if (!vendedorId) return []
   const q    = query(col('visitas'), where('vendedorId', '==', vendedorId))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -486,17 +504,23 @@ export const obtenerVisitasPorVendedor = async (vendedorId) => {
 // ── COBROS / PAGOS ────────────────────────────────────
 export const registrarPago = async (clienteId, montoPagado, deudaActual, metodoPago = 'efectivo', referencia = '') => {
   requireAuth()
-  if (!clienteId)       throw new Error('clienteId requerido')
-  if (montoPagado <= 0) throw new Error('Monto debe ser mayor a 0')
+  if (!clienteId)                          throw new Error('clienteId requerido')
+  if (montoPagado <= 0)                    throw new Error('Monto debe ser mayor a 0')
+  // SECURITY: verificar contra el valor real en Firestore, no el que envía el cliente
+  const clienteSnap = await getDoc(docRef('clientes', clienteId))
+  if (!clienteSnap.exists())               throw new Error('Cliente no encontrado')
+  const deudaReal = Number(clienteSnap.data().deuda) || 0
+  if (Number(montoPagado) > deudaReal + 0.01) // +0.01 por tolerancia de punto flotante
+    throw new Error(`Monto (${montoPagado}) supera la deuda real (${deudaReal})`)
 
-  const nuevaDeuda = Math.max(0, (Number(deudaActual) || 0) - Number(montoPagado))
+  const nuevaDeuda = Math.max(0, deudaReal - Number(montoPagado))
 
   await actualizarCliente(clienteId, { deuda: nuevaDeuda })
 
   await addDoc(col('pagos'), {
     clienteId,
     monto:        Number(montoPagado),
-    deudaAntes:   Number(deudaActual) || 0,
+    deudaAntes:   deudaReal,
     deudaDespues: nuevaDeuda,
     metodoPago,
     referencia,
