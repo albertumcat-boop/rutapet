@@ -159,7 +159,7 @@ export function ConfigProvider({ children }) {
     await guardarEnFirestore(newConfig)
   }
 
-  const isAdmin = userRole === 'admin' || (!userRole && !empresaId)
+  const isAdmin = userRole === 'admin'
 
   return (
     <ConfigContext.Provider value={{

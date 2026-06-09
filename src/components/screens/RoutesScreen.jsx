@@ -32,6 +32,7 @@ export default function RoutesScreen({ onBack }) {
       const ref = await agregarRuta({ nombre, clientes:selCls, fecha, estado:'pendiente', km:0 })
       setRutas(prev => [{ id:ref.id, nombre, clientes:selCls, fecha, estado:'pendiente', km:0 }, ...prev])
       setGuardado(true)
+      recargar()
       setTimeout(() => {
         setShowForm(false); setGuardado(false)
         setNombre(''); setSelCls([])
@@ -58,6 +59,7 @@ export default function RoutesScreen({ onBack }) {
     setRutas(prev => prev.filter(r => r.id !== id))
     if (open === id) setOpen(null)
     await deleteRuta(id)
+    recargar()
   }
 
   // Iniciar ruta desde ubicación actual en Google Maps

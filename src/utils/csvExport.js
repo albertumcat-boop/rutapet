@@ -36,14 +36,15 @@ export function exportarVentas(ventas, clientes = [], productos = []) {
   const getCliente = (id) => clientes.find(c => c.id === id)?.nombre || id
   const hoy = new Date().toISOString().split('T')[0]
 
-  const header = ['Fecha','Cliente','Total','Descuento%','Monto pagado','Deuda generada','Método pago','Vendedor']
+  const header = ['Fecha','Cliente','Total','Descuento%','Monto pagado','Saldo pendiente','Estado','Método pago','Vendedor']
   const filas  = ventas.map(v => [
     v.fecha?.toDate?.().toLocaleDateString('es-VE') || v.fecha || '',
     getCliente(v.clienteId),
     v.total ?? '',
     v.descuento ?? 0,
-    v.montoPagado ?? v.total ?? '',
-    v.deudaGenerada ?? 0,
+    v.montoPagado ?? 0,
+    Math.max(0, (v.total ?? 0) - (v.montoPagado ?? 0)),
+    v.estado || '',
     v.metodoPago || '',
     v.vendedorNombre || '',
   ])

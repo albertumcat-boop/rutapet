@@ -360,7 +360,7 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               <Button icon="plus" fullWidth onClick={() => nav('addSale', { clienteId:c.id })}>Nueva venta</Button>
-              <Button icon="calendar" variant="secondary" fullWidth>Registrar visita</Button>
+              <Button icon="calendar" variant="secondary" fullWidth onClick={() => nav('visits', { clienteId: c.id })}>Registrar visita</Button>
             </div>
           </>
         )}

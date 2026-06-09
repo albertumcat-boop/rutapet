@@ -39,7 +39,7 @@ export default function CommissionsScreen({ onBack }) {
   const getNombreVendedor = (vendedorId) => {
     if (vendedorId === user?.uid) return 'Tú'
     const miembro = equipo?.find(m => m.id === vendedorId)
-    return miembro?.nombre || miembro?.email?.split('@')[0] || `Vendedor ${vendedorId.slice(-4)}`
+    return miembro?.nombre || miembro?.email?.split('@')[0] || 'Vendedor desconocido'
   }
 
   const { mes: mesHoy, anio: anioHoy } = getMesActual()
@@ -171,7 +171,7 @@ export default function CommissionsScreen({ onBack }) {
             {isAdmin && (
               <div style={{ background: '#EFF6FF', borderRadius: 12, padding: '12px 14px', marginTop: 8, border: '1px solid #BFDBFE' }}>
                 <p style={{ fontSize: 12, color: '#1E40AF', margin: 0, fontWeight: 600 }}>
-                  💡 Puedes cambiar el % de comisión desde Configuración → Empresa
+                  💡 Puedes cambiar el % de comisión desde <b>Administración</b> → Empresa
                 </p>
               </div>
             )}

@@ -144,7 +144,7 @@ export default function App() {
       case 'payments':     return <PaymentsScreen     onBack={goBack} />
       case 'analytics':    return <AnalyticsScreen    onBack={goBack} />
       case 'routes':       return <RoutesScreen       onBack={goBack} />
-      case 'visits':       return <VisitsScreen       nav={nav} onBack={goBack} />
+      case 'visits':       return <VisitsScreen       nav={nav} onBack={goBack} initClienteId={screenData?.clienteId} />
       case 'more':         return <MoreScreen         nav={nav} onLogout={handleLogout} />
       case 'admin':        return <AdminScreen        onBack={goBack} nav={nav} />
       case 'about':        return <AboutScreen        onBack={goBack} />
@@ -159,7 +159,7 @@ export default function App() {
   if (isDesktop) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: C.gray50 }}>
-        <Sidebar current={screen} onChange={tabChange} onLogout={handleLogout} nav={nav} />
+        <Sidebar current={screen} onChange={tabChange} onLogout={handleLogout} />
 
         <main style={{ flex: 1, minHeight: '100vh', overflowX: 'hidden', overflowY: 'auto', background: C.gray50 }}>
           {/* Topbar desktop */}

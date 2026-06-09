@@ -61,12 +61,6 @@ export const metodoPagoLabel = (metodo) => ({
   otro:          'Otro',
 }[metodo] || metodo || '—')
 
-// ── Helpers de tipo de cliente (dinámico desde config) ─
-// Estos se usan cuando no hay config disponible (fallback)
-export const tipoColor    = (tipo) => C.gray400
-export const tipoIconName = (tipo) => 'users'
-export const tipoColor2   = (tipo) => C.teal
-
 // ── Colores de categoría de producto (fallback) ────────
 export const categoriaColor = (cat) => ({
   alimento:  C.green,

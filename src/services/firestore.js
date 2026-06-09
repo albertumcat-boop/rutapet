@@ -141,8 +141,8 @@ export const agregarCliente = async (data) => {
     ruc:                 data.ruc                  || '',
     veterinario:         data.veterinario          || '',
     tipoEstablecimiento: data.tipoEstablecimiento  || '',
-    lat:                 Number(data.lat)          || 0,
-    lng:                 Number(data.lng)          || 0,
+    lat:                 (data.lat != null && data.lat !== '') ? Number(data.lat) : null,
+    lng:                 (data.lng != null && data.lng !== '') ? Number(data.lng) : null,
     foto:                data.foto                 || null,
     vendedorId:          uid(),
     tenantId:            uid(),
@@ -303,6 +303,19 @@ export const agregarVenta = async (data) => {
   const montoPagado = Number(data.montoPagado) || 0
   const estado      = data.estado || 'pendiente'
 
+  // Determinar tenantId correcto: si el vendedor pertenece a una empresa,
+  // usar empresaId del admin para que el admin vea las ventas consolidadas
+  let tenantId = uid()
+  try {
+    const userSnap = await getDoc(docRef('usuarios', uid()))
+    if (userSnap.exists()) {
+      const userData = userSnap.data()
+      if (userData.rol === 'vendedor' && userData.empresaId) {
+        tenantId = userData.empresaId
+      }
+    }
+  } catch {}
+
   const ref = await addDoc(col('ventas'), {
     clienteId:      data.clienteId,
     items:          data.items       || [],
@@ -316,7 +329,7 @@ export const agregarVenta = async (data) => {
     notas:          data.notas       || '',
     vendedorNombre: data.vendedorNombre || '',
     vendedorId:     uid(),
-    tenantId:       uid(),
+    tenantId,
     fecha:          serverTimestamp(),
     creadoEn:       serverTimestamp(),
   })

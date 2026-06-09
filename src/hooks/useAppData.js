@@ -73,7 +73,7 @@ export function useAppData() {
       try {
         const usuario = await obtenerUsuario()
         const empresaId = usuario?.empresaId || uid
-        const isAdmin   = usuario?.rol === 'admin' || !usuario?.rol
+        const isAdmin   = usuario?.rol === 'admin'
 
         if (isAdmin) {
           equipo = await obtenerMiembrosEquipo(empresaId)

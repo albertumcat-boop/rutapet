@@ -306,7 +306,7 @@ export default function DashboardScreen({ nav }) {
             </p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: C.gray400 }}>{rutaHoy.fecha}</span>
-              <Button size="sm" icon="nav" onClick={e => e.stopPropagation()}>Iniciar</Button>
+              <Button size="sm" icon="nav" onClick={e => { e.stopPropagation(); nav('routes') }}>Iniciar</Button>
             </div>
           </div>
         </div>

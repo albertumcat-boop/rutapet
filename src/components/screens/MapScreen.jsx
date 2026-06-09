@@ -5,6 +5,7 @@ import { useConfig } from '../../context/ConfigContext'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
 import Button from '../shared/Button'
+import TopBar from '../shared/TopBar'
 
 export default function MapScreen({ nav, onBack }) {
   const { clientes } = useAppData()
@@ -210,8 +211,11 @@ export default function MapScreen({ nav, onBack }) {
   return (
     <div className="screen-enter" style={{ background: C.gray50, minHeight: '100vh' }}>
 
+      {/* TopBar solo en mobile (el Sidebar ya navega en desktop) */}
+      {onBack && <TopBar title="Mapa de clientes" onBack={onBack} />}
+
       {/* Header */}
-      <div style={{ background: C.navy, padding: '20px 14px 14px' }}>
+      <div style={{ background: C.navy, padding: onBack ? '0 14px 14px' : '20px 14px 14px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
           <h1 style={{ fontSize:20, fontWeight:900, color:'#fff', margin:0 }}>Mapa de clientes</h1>
           <div style={{ textAlign:'right' }}>

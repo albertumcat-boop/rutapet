@@ -238,7 +238,7 @@ export default function ProductsScreen({ onBack, nav }) {
           const color     = getCatColor(p.categoria)
           const icon      = p.esMedicamento ? 'pill' : getCatIcon(p.categoria)
           const label     = getCatLabel(p.categoria)
-          const stockBajo = (p.stock || 0) <= (p.stockMinimo || 5)
+          const stockBajo = (p.stockMinimo > 0) ? (p.stock ?? 0) <= p.stockMinimo : (p.stock ?? 0) === 0
           const dias      = diasParaVencer(p.fechaVencimiento)
           const vencInfo  = colorVencimiento(dias)
 

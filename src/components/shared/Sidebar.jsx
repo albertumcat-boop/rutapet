@@ -26,10 +26,10 @@ const NAV_ITEMS = [
   { key: 'visits',    icon: 'calendar',    label: 'Visitas'         },
   { key: 'commissions',icon: 'trending_up', label: 'Comisiones'      },
   { key: 'team',      icon: 'team',        label: 'Mi equipo',      adminOnly: true },
-  { key: 'admin',     icon: 'settings',    label: 'Configuración'   },
+  { key: 'admin',     icon: 'settings',    label: 'Configuración',  adminOnly: true },
 ]
 
-export default function Sidebar({ current, onChange, onLogout, nav }) {
+export default function Sidebar({ current, onChange, onLogout }) {
   const { clientes, ventas, productos } = useAppData()
   const { config, isAdmin }             = useConfig()
   const user    = auth.currentUser

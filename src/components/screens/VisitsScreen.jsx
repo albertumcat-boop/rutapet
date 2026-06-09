@@ -19,15 +19,15 @@ import Button from '../shared/Button'
 import TopBar from '../shared/TopBar'
 import SignaturePad from '../shared/SignaturePad'
 
-export default function VisitsScreen({ nav, onBack }) {
+export default function VisitsScreen({ nav, onBack, initClienteId }) {
   const { clientes, visitas, recargar } = useAppData()
   const { config }  = useConfig()
   const toast       = useToast()
   const user        = auth.currentUser
   const vendedorNombre = user?.displayName || user?.email?.split('@')[0] || 'Vendedor'
 
-  const [showForm,   setShowForm]   = useState(false)
-  const [clienteId,  setClienteId]  = useState('')
+  const [showForm,   setShowForm]   = useState(!!initClienteId)
+  const [clienteId,  setClienteId]  = useState(initClienteId || '')
   const [vendio,     setVendio]     = useState(true)
   const [notas,      setNotas]      = useState('')
   const [firma,      setFirma]      = useState(null)

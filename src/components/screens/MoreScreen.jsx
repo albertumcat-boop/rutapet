@@ -63,7 +63,7 @@ export default function MoreScreen({ nav, onLogout }) {
           { icon:'route',       label:'Rutas',            sub:'Planificar visitas',       color:'#3B82F6', screen:'routes',      adminOnly:false },
           { icon:'calendar',    label:'Visitas',          sub:'Historial y registro',     color:'#14B8A6', screen:'visits',      adminOnly:false },
           { icon:'team',        label:'Equipo',           sub:'Gestionar vendedores',     color:'#6366F1', screen:'team',        adminOnly:true  },
-          { icon:'settings',    label:'Administración',   sub:'Panel de control',         color:'#A78BFA', screen:'admin',       adminOnly:false },
+          { icon:'settings',    label:'Administración',   sub:'Panel de control',         color:'#A78BFA', screen:'admin',       adminOnly:true  },
           { icon:'activity',    label:'Acerca de',        sub:'Info de la app',           color:'#94A3B8', screen:'about',       adminOnly:false },
         ].filter(item => !item.adminOnly || isAdmin).map((item,i) => (
           <Card key={i} onClick={() => nav(item.screen)}>
