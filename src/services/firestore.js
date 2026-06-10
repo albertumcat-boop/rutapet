@@ -7,6 +7,7 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc,
   getDocs, getDoc, setDoc, query, where,
   serverTimestamp, orderBy, limit,
+  increment, onSnapshot,
 } from 'firebase/firestore'
 import { db, auth } from '../../firebase/firebase.config'
 
@@ -101,6 +102,11 @@ export const aceptarInvitacion = async (invitacionId) => {
   if (!snap.exists()) throw new Error('Invitación no encontrada')
   const inv = snap.data()
   if (inv.estado !== 'pendiente') throw new Error('Invitación ya procesada')
+  // SECURITY: verificar que la invitación sea para el usuario actual
+  const emailActual = auth.currentUser?.email?.toLowerCase()
+  if (inv.emailInvitado && emailActual && inv.emailInvitado !== emailActual) {
+    throw new Error('Esta invitación no es para tu correo electrónico')
+  }
 
   await updateDoc(docRef('invitaciones', invitacionId), {
     estado:    'aceptada',
@@ -156,7 +162,7 @@ export const agregarCliente = async (data) => {
 
 export const obtenerClientes = async () => {
   requireAuth()
-  const q    = query(col('clientes'), where('vendedorId', '==', uid()))
+  const q    = query(col('clientes'), where('vendedorId', '==', uid()), limit(500))
   const snap = await getDocs(q)
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
@@ -265,10 +271,20 @@ export const obtenerProductos = async () => {
 export const actualizarProducto = async (id, data) => {
   requireAuth()
   if (!id) throw new Error('ID de producto requerido')
-  await updateDoc(docRef('productos', id), {
-    ...data,
-    actualizadoEn: serverTimestamp(),
-  })
+  // SECURITY: whitelist — evita sobreescribir tenantId u otros campos de sistema
+  const permitidos = [
+    'nombre','categoria','marca','precio','stock','stockMinimo','descripcion',
+    'principioActivo','concentracion','presentacion','unidad','lote',
+    'fechaVencimiento','registroSanitario','cadenaFrio','requiereReceta',
+    'esMedicamento','precios','activo',
+  ]
+  const update = {}
+  for (const key of permitidos) {
+    if (data[key] !== undefined) update[key] = data[key]
+  }
+  if (Object.keys(update).length === 0) return
+  update.actualizadoEn = serverTimestamp()
+  await updateDoc(docRef('productos', id), update)
 }
 
 export const eliminarProducto = async (id) => {
@@ -336,36 +352,40 @@ export const agregarVenta = async (data) => {
     creadoEn:       serverTimestamp(),
   })
 
-  // Actualizar última visita del cliente
-  await actualizarCliente(data.clienteId, {
-    ultimaVisita: serverTimestamp(),
-  })
+  // Ops secundarias — fallan silenciosamente para no cancelar la venta ya creada
 
-  // Descontar stock de cada producto vendido
+  // Actualizar última visita del cliente
+  try {
+    await actualizarCliente(data.clienteId, { ultimaVisita: serverTimestamp() })
+  } catch (err) {
+    console.warn('agregarVenta: no se pudo actualizar ultimaVisita:', err)
+  }
+
+  // Descontar stock de cada producto vendido — ATÓMICO con increment()
   for (const item of (data.items || [])) {
     if (!item.pId || !item.qty) continue
     try {
-      const prodSnap = await getDoc(docRef('productos', item.pId))
-      if (prodSnap.exists()) {
-        const stockActual = prodSnap.data().stock || 0
-        const nuevoStock  = Math.max(0, stockActual - Number(item.qty))
-        await updateDoc(docRef('productos', item.pId), {
-          stock: nuevoStock, actualizadoEn: serverTimestamp(),
-        })
-      }
+      await updateDoc(docRef('productos', item.pId), {
+        stock:         increment(-Math.abs(Number(item.qty))),
+        actualizadoEn: serverTimestamp(),
+      })
     } catch (err) {
-      console.warn(`No se pudo descontar stock de ${item.pId}:`, err)
+      console.warn(`agregarVenta: no se pudo descontar stock de ${item.pId}:`, err)
     }
   }
 
-  // FIX: Solo agregar a deuda el monto que quedó sin pagar
+  // Agregar a deuda el monto que quedó sin pagar
   if (estado === 'pendiente' || estado === 'parcial') {
-    const clienteSnap = await getDoc(docRef('clientes', data.clienteId))
-    if (clienteSnap.exists()) {
-      const deudaActual  = clienteSnap.data().deuda || 0
-      const montoADeuda  = Math.max(0, Number(data.total) - montoPagado)
-      const nuevaDeuda   = deudaActual + montoADeuda
-      await actualizarCliente(data.clienteId, { deuda: Math.max(0, nuevaDeuda) })
+    try {
+      const montoADeuda = Math.max(0, Number(data.total) - montoPagado)
+      if (montoADeuda > 0) {
+        await updateDoc(docRef('clientes', data.clienteId), {
+          deuda:         increment(montoADeuda),
+          actualizadoEn: serverTimestamp(),
+        })
+      }
+    } catch (err) {
+      console.warn('agregarVenta: no se pudo actualizar deuda:', err)
     }
   }
 
@@ -374,7 +394,7 @@ export const agregarVenta = async (data) => {
 
 export const obtenerVentas = async () => {
   requireAuth()
-  const q    = query(col('ventas'), where('vendedorId', '==', uid()))
+  const q    = query(col('ventas'), where('vendedorId', '==', uid()), limit(500))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
@@ -426,7 +446,7 @@ export const agregarVisita = async (data) => {
 
 export const obtenerVisitas = async () => {
   requireAuth()
-  const q    = query(col('visitas'), where('vendedorId', '==', uid()))
+  const q    = query(col('visitas'), where('vendedorId', '==', uid()), limit(500))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
@@ -640,4 +660,34 @@ export const labelPorcentaje = (pct) => {
   if (pct >= 80) return '✓ Bien surtida'
   if (pct >= 50) return '⚠ Surtido medio'
   return '✗ Necesita restock'
+}
+
+// ── LISTENERS EN TIEMPO REAL ──────────────────────────
+// Retornan la función unsubscribe — llamar en el cleanup del useEffect.
+
+export const suscribirClientes = (vendedorId, callback) => {
+  const q = query(col('clientes'), where('vendedorId', '==', vendedorId), limit(500))
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.activo !== false))
+  }, err => console.error('suscribirClientes:', err))
+}
+
+export const suscribirVentas = (vendedorId, callback) => {
+  const q = query(col('ventas'), where('vendedorId', '==', vendedorId), limit(500))
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  }, err => console.error('suscribirVentas:', err))
+}
+
+export const suscribirProductos = (tenantId, callback) => {
+  const q = query(col('productos'), where('tenantId', '==', tenantId), limit(300))
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.activo !== false))
+  }, err => console.error('suscribirProductos:', err))
+}
+
+export const suscribirUsuario = (uid, callback) => {
+  return onSnapshot(doc(db, 'usuarios', uid), snap => {
+    callback(snap.exists() ? { id: snap.id, ...snap.data() } : null)
+  }, err => console.error('suscribirUsuario:', err))
 }

@@ -22,7 +22,7 @@ function diasParaVencer(fechaStr) {
 }
 
 export default function DashboardScreen({ nav }) {
-  const { clientes, ventas, rutas, productos, loading } = useAppData()
+  const { clientes, ventas, rutas, productos, loading, error: dataError, recargar } = useAppData()
   const { config, isAdmin } = useConfig()
   const toast = useToast()
   const [showNotif, setShowNotif] = useState(false)
@@ -160,6 +160,19 @@ export default function DashboardScreen({ nav }) {
 
   return (
     <div className="screen-enter" style={{ background: C.gray50, minHeight: '100vh' }}>
+
+      {/* Banner de error de carga */}
+      {dataError && (
+        <div style={{ background:'#FEE2E2', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+          <p style={{ fontSize:13, color:'#991B1B', fontWeight:600, margin:0 }}>
+            ⚠ Error cargando datos — {dataError}
+          </p>
+          <button onClick={recargar}
+            style={{ fontSize:12, color:'#991B1B', fontWeight:800, background:'none', border:'1px solid #991B1B', borderRadius:8, padding:'4px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ background: C.navy, padding: '20px 16px 28px', color: '#fff' }}>

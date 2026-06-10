@@ -53,11 +53,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         runtimeCaching: [
           {
-            // Tiles de OpenStreetMap — cache primero
+            // Tiles de OpenStreetMap — cache primero (versión para invalidación manual)
             urlPattern: /^https:\/\/[abc]\.tile\.openstreetmap\.org\/.*/i,
             handler:    'CacheFirst',
             options: {
-              cacheName:  'osm-tiles',
+              cacheName:  'osm-tiles-v2',
               expiration: {
                 maxEntries:     300,
                 maxAgeSeconds:  60 * 60 * 24 * 7, // 7 días
@@ -69,7 +69,7 @@ export default defineConfig({
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
             handler:    'StaleWhileRevalidate',
             options: {
-              cacheName: 'google-fonts',
+              cacheName: 'google-fonts-v2',
               expiration: { maxEntries:20, maxAgeSeconds:60*60*24*365 },
             },
           },

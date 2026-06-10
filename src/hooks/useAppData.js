@@ -1,14 +1,11 @@
 /**
  * useAppData.js — Hook central de datos
- * Fase 4: Admin ve datos consolidados de todo el equipo
+ * Fase 5: Listeners en tiempo real (onSnapshot) para clientes, ventas y productos.
+ * Admin ve datos consolidados de todo el equipo.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { auth } from '../../firebase/firebase.config'
 import {
-  obtenerClientes,
-  obtenerVentas,
-  obtenerProductos,
-  obtenerVisitas,
   obtenerRutas,
   obtenerTodoInventario,
   obtenerMiembrosEquipo,
@@ -16,6 +13,9 @@ import {
   obtenerVentasPorVendedor,
   obtenerVisitasPorVendedor,
   obtenerUsuario,
+  suscribirClientes,
+  suscribirVentas,
+  suscribirProductos,
 } from '../services/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -26,12 +26,8 @@ const EMPTY_DATA = {
   visitas:    [],
   rutas:      [],
   inventario: [],
-  equipo:     [],   // miembros del equipo (solo admin)
+  equipo:     [],
 }
-
-// Cache en memoria — se limpia al cambiar de usuario
-let cache     = null
-let cacheUid  = null
 
 function uniq(arr, key = 'id') {
   const seen = new Set()
@@ -43,108 +39,129 @@ function uniq(arr, key = 'id') {
 }
 
 export function useAppData() {
-  const [data,    setData]    = useState(cache || EMPTY_DATA)
-  const [loading, setLoading] = useState(!cache)
+  const [data,    setData]    = useState(EMPTY_DATA)
+  const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
+
+  // Referencias a datos en tiempo real para combinar con equipo
+  const propiosRef = useRef({ clientes: [], ventas: [], productos: [] })
+  const equipoRef  = useRef({ clientes: [], ventas: [] })
   const mountedRef = useRef(true)
 
-  const cargarTodo = async (uid) => {
+  // Merge helper — combina propios + equipo y retorna datos completos
+  const merge = useCallback((overrides = {}) => {
     if (!mountedRef.current) return
-    setLoading(true)
-    setError(null)
-    try {
-      // Cargar datos propios
-      const [clientes, ventas, productos, visitas, rutas, inventario] =
-        await Promise.all([
-          obtenerClientes(),
-          obtenerVentas(),
-          obtenerProductos(),
-          obtenerVisitas(),
+    setData(prev => ({
+      ...prev,
+      clientes:  uniq([...propiosRef.current.clientes, ...equipoRef.current.clientes]),
+      ventas:    uniq([...propiosRef.current.ventas,   ...equipoRef.current.ventas  ]),
+      productos: propiosRef.current.productos,
+      ...overrides,
+    }))
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    const unsubs = []
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!mountedRef.current) return
+
+      // Limpiar suscripciones anteriores
+      unsubs.forEach(fn => fn())
+      unsubs.length = 0
+
+      if (!user) {
+        propiosRef.current = { clientes: [], ventas: [], productos: [] }
+        equipoRef.current  = { clientes: [], ventas: [] }
+        setData(EMPTY_DATA)
+        setLoading(false)
+        setError(null)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        // Obtener tenantId del usuario (para productos multi-empresa)
+        const userData = await obtenerUsuario()
+        const isAdmin  = userData?.rol === 'admin'
+        const tenantId = (userData?.rol === 'vendedor' && userData?.empresaId)
+          ? userData.empresaId
+          : user.uid
+
+        // ── Listeners en tiempo real ──────────────────────────
+
+        // Clientes propios
+        unsubs.push(suscribirClientes(user.uid, clientes => {
+          propiosRef.current.clientes = clientes
+          merge()
+        }))
+
+        // Ventas propias
+        unsubs.push(suscribirVentas(user.uid, ventas => {
+          propiosRef.current.ventas = ventas
+          merge()
+        }))
+
+        // Productos (del tenant/empresa)
+        unsubs.push(suscribirProductos(tenantId, productos => {
+          propiosRef.current.productos = productos
+          merge()
+          setLoading(false) // primer snapshot = datos disponibles
+        }))
+
+        // ── One-time fetch para colecciones menos críticas ────
+        const [rutas, inventario] = await Promise.all([
           obtenerRutas(),
           obtenerTodoInventario(),
         ])
 
-      let todosClientes  = clientes
-      let todasVentas    = ventas
-      let todasVisitas   = visitas
-      let equipo         = []
+        if (!mountedRef.current) return
+        setData(prev => ({ ...prev, rutas, inventario }))
 
-      // Si es admin, cargar datos de todo el equipo
-      try {
-        const usuario = await obtenerUsuario()
-        const empresaId = usuario?.empresaId || uid
-        const isAdmin   = usuario?.rol === 'admin'
-
+        // ── Datos del equipo (solo admin) ─────────────────────
         if (isAdmin) {
-          equipo = await obtenerMiembrosEquipo(empresaId)
-          // Filtrar solo vendedores (no el admin mismo)
-          const vendedores = equipo.filter(m => m.id !== uid && m.rol === 'vendedor')
+          try {
+            const empresaId = userData?.empresaId || user.uid
+            const equipo    = await obtenerMiembrosEquipo(empresaId)
+            const vendedores = equipo.filter(m => m.id !== user.uid && m.rol === 'vendedor')
 
-          if (vendedores.length > 0) {
-            const equipoData = await Promise.all(
-              vendedores.map(async (v) => ({
-                vendedorId: v.id,
-                clientes:   await obtenerClientesPorVendedor(v.id),
-                ventas:     await obtenerVentasPorVendedor(v.id),
-                visitas:    await obtenerVisitasPorVendedor(v.id),
-              }))
-            )
-            for (const d of equipoData) {
-              todosClientes = uniq([...todosClientes, ...d.clientes])
-              todasVentas   = uniq([...todasVentas,   ...d.ventas  ])
-              todasVisitas  = uniq([...todasVisitas,  ...d.visitas ])
+            setData(prev => ({ ...prev, equipo }))
+
+            if (vendedores.length > 0) {
+              const resultados = await Promise.all(
+                vendedores.map(async v => ({
+                  clientes: await obtenerClientesPorVendedor(v.id),
+                  ventas:   await obtenerVentasPorVendedor(v.id),
+                  visitas:  await obtenerVisitasPorVendedor(v.id),
+                }))
+              )
+              equipoRef.current.clientes = uniq(resultados.flatMap(r => r.clientes))
+              equipoRef.current.ventas   = uniq(resultados.flatMap(r => r.ventas))
+              const todasVisitas         = uniq(resultados.flatMap(r => r.visitas))
+              if (mountedRef.current) {
+                setData(prev => ({ ...prev, visitas: todasVisitas, equipo }))
+                merge()
+              }
             }
+          } catch (err) {
+            console.warn('useAppData: no se pudo cargar equipo:', err)
           }
         }
+
+        // Visitas propias (one-time, no cambian en tiempo real con frecuencia)
+        const { obtenerVisitas } = await import('../services/firestore')
+        const visitas = await obtenerVisitas()
+        if (mountedRef.current) {
+          setData(prev => ({ ...prev, visitas: uniq([...visitas, ...(prev.visitas || [])]) }))
+        }
+
       } catch (err) {
-        // Si falla la carga del equipo, seguir con datos propios
-        console.warn('useAppData: no se pudo cargar equipo:', err)
-      }
-
-      if (!mountedRef.current) return
-
-      const newData = {
-        clientes:  todosClientes,
-        ventas:    todasVentas,
-        productos,
-        visitas:   todasVisitas,
-        rutas,
-        inventario,
-        equipo,
-      }
-      cache    = newData
-      cacheUid = uid
-      setData(newData)
-    } catch (err) {
-      if (!mountedRef.current) return
-      console.error('useAppData error:', err)
-      setError(err.message || 'Error cargando datos')
-    } finally {
-      if (mountedRef.current) setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    mountedRef.current = true
-
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!mountedRef.current) return
-
-      if (user) {
-        if (cacheUid && cacheUid !== user.uid) {
-          cache    = null
-          cacheUid = null
-        }
-        if (cache && cacheUid === user.uid) {
-          setData(cache)
-          setLoading(false)
-        } else {
-          cargarTodo(user.uid)
-        }
-      } else {
-        cache    = null
-        cacheUid = null
-        setData(EMPTY_DATA)
+        if (!mountedRef.current) return
+        console.error('useAppData error:', err)
+        setError(err.message || 'Error al cargar los datos')
         setLoading(false)
       }
     })
@@ -152,15 +169,25 @@ export function useAppData() {
     return () => {
       mountedRef.current = false
       unsub()
+      unsubs.forEach(fn => fn())
+    }
+  }, [merge])
+
+  const recargar = useCallback(async () => {
+    // Con onSnapshot los datos ya se actualizan solos.
+    // Esta función refresca las colecciones one-time (rutas, inventario, equipo).
+    const user = auth.currentUser
+    if (!user) return
+    try {
+      const [rutas, inventario] = await Promise.all([
+        obtenerRutas(),
+        obtenerTodoInventario(),
+      ])
+      if (mountedRef.current) setData(prev => ({ ...prev, rutas, inventario }))
+    } catch (err) {
+      console.warn('recargar:', err)
     }
   }, [])
-
-  const recargar = async () => {
-    cache    = null
-    cacheUid = null
-    const user = auth.currentUser
-    if (user) await cargarTodo(user.uid)
-  }
 
   return { ...data, loading, error, recargar }
 }

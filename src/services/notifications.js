@@ -33,6 +33,24 @@ function getMsg() {
  * Solicita permiso para notificaciones y retorna el FCM token.
  * Retorna null si el usuario lo niega o si no está soportado.
  */
+const FIREBASE_CONFIG = {
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+}
+
+// Responder al SW cuando pide la config (fix race condition)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'REQUEST_FIREBASE_CONFIG') {
+      event.source?.postMessage({ type: 'FIREBASE_CONFIG', config: FIREBASE_CONFIG })
+    }
+  })
+}
+
 export async function solicitarPermisoPush() {
   if (!('Notification' in window)) return null
   if (!VAPID_KEY) {
@@ -44,19 +62,13 @@ export async function solicitarPermisoPush() {
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') return null
 
-    // Registrar el SW de mensajería
+    // Registrar y esperar a que el SW esté activo
     const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    await navigator.serviceWorker.ready
 
-    // Enviar la config al SW para que pueda inicializar Firebase
-    const firebaseConfig = {
-      apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId:             import.meta.env.VITE_FIREBASE_APP_ID,
-    }
-    swReg.active?.postMessage({ type: 'FIREBASE_CONFIG', config: firebaseConfig })
+    // Enviar config al SW (por si ya estaba activo y no recibió el activate)
+    const sw = swReg.active || swReg.waiting || swReg.installing
+    sw?.postMessage({ type: 'FIREBASE_CONFIG', config: FIREBASE_CONFIG })
 
     const msg   = getMsg()
     if (!msg) return null

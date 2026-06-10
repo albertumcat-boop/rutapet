@@ -4,10 +4,11 @@
  */
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { auth } from '../../firebase/firebase.config'
-import { onAuthStateChanged } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase/firebase.config'
 import { setupUsuarioNuevo } from '../services/setupFirestore'
+import { suscribirUsuario } from '../services/firestore'
 
 const DEFAULT_CONFIG = {
   empresa: {
@@ -30,13 +31,17 @@ export function ConfigProvider({ children }) {
   const [userRole,  setUserRole]  = useState(null)   // 'admin' | 'vendedor' | null
   const [empresaId, setEmpresaId] = useState(null)   // null = solo, uid = empresa
   const [loading,   setLoading]   = useState(true)
-  const mountedRef = useRef(true)
+  const mountedRef  = useRef(true)
+  const unsubUserRef = useRef(null)
 
   useEffect(() => {
     mountedRef.current = true
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!mountedRef.current) return
+
+      // Limpiar listener anterior de usuario
+      if (unsubUserRef.current) { unsubUserRef.current(); unsubUserRef.current = null }
 
       if (!user) {
         setConfig(DEFAULT_CONFIG)
@@ -52,57 +57,58 @@ export function ConfigProvider({ children }) {
         if (!mountedRef.current) return
         setTenantId(tid)
 
-        // Obtener datos del usuario para rol y empresaId
-        const userSnap = await getDoc(doc(db, 'usuarios', user.uid))
-        if (!mountedRef.current) return
+        // ── Listener en tiempo real del documento del usuario ──
+        // Detecta: desactivación, cambio de rol, etc.
+        unsubUserRef.current = suscribirUsuario(user.uid, async (userData) => {
+          if (!mountedRef.current) return
 
-        let rol       = null
-        let empId     = null
-        let configId  = tid  // por defecto config = uid propio
-
-        if (userSnap.exists()) {
-          const userData = userSnap.data()
-          rol   = userData.rol       || null
-          empId = userData.empresaId || null
-
-          // Si el usuario es vendedor de una empresa, cargar config de la empresa
-          if (rol === 'vendedor' && empId) {
-            configId = empId
+          // Si el vendedor fue desactivado por el admin → forzar logout
+          if (userData && userData.rol === 'vendedor' && userData.activo === false) {
+            console.warn('ConfigContext: vendedor desactivado — cerrando sesión')
+            await signOut(auth)
+            return
           }
-        }
 
-        if (mountedRef.current) {
-          setUserRole(rol)
-          setEmpresaId(empId)
-        }
+          const rol    = userData?.rol       || null
+          const empId  = userData?.empresaId || null
+          const configId = (rol === 'vendedor' && empId) ? empId : tid
 
-        // Cargar config desde Firestore (del tenant o empresa)
-        const configSnap = await getDoc(doc(db, 'config', configId))
-        if (!mountedRef.current) return
+          if (mountedRef.current) {
+            setUserRole(rol)
+            setEmpresaId(empId)
+          }
 
-        if (configSnap.exists()) {
-          const data = configSnap.data()
-          setConfig({
-            empresa:            data.empresa            || DEFAULT_CONFIG.empresa,
-            tiposCliente:       Array.isArray(data.tiposCliente)       ? data.tiposCliente       : [],
-            categoriasProducto: Array.isArray(data.categoriasProducto) ? data.categoriasProducto : [],
-            onboardingCompleto: Boolean(data.onboardingCompleto),
-            comisionPct:        data.comisionPct !== undefined ? Number(data.comisionPct) : 5,
-          })
-        } else {
-          setConfig(DEFAULT_CONFIG)
-        }
+          // Cargar config del tenant o empresa
+          const { getDoc, doc: firestoreDoc } = await import('firebase/firestore')
+          const configSnap = await getDoc(firestoreDoc(db, 'config', configId))
+          if (!mountedRef.current) return
+
+          if (configSnap.exists()) {
+            const data = configSnap.data()
+            setConfig({
+              empresa:            data.empresa            || DEFAULT_CONFIG.empresa,
+              tiposCliente:       Array.isArray(data.tiposCliente)       ? data.tiposCliente       : [],
+              categoriasProducto: Array.isArray(data.categoriasProducto) ? data.categoriasProducto : [],
+              onboardingCompleto: Boolean(data.onboardingCompleto),
+              comisionPct:        data.comisionPct !== undefined ? Number(data.comisionPct) : 5,
+            })
+          } else {
+            setConfig(DEFAULT_CONFIG)
+          }
+
+          if (mountedRef.current) setLoading(false)
+        })
+
       } catch (err) {
         console.error('ConfigContext error:', err)
-        if (mountedRef.current) setConfig(DEFAULT_CONFIG)
-      } finally {
-        if (mountedRef.current) setLoading(false)
+        if (mountedRef.current) { setConfig(DEFAULT_CONFIG); setLoading(false) }
       }
     })
 
     return () => {
       mountedRef.current = false
       unsub()
+      if (unsubUserRef.current) unsubUserRef.current()
     }
   }, [])
 

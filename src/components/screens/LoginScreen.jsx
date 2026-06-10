@@ -11,6 +11,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 
 const provider = new GoogleAuthProvider()
@@ -31,12 +32,14 @@ const ERROR_MESSAGES = {
 const getErrorMsg = (code) => ERROR_MESSAGES[code] || 'Ocurrió un error. Intenta de nuevo'
 
 export default function LoginScreen({ onLogin, onVolver }) {
-  const [modo,     setModo]     = useState('login')
-  const [email,    setEmail]    = useState('')
-  const [pass,     setPass]     = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [loadingG, setLoadingG] = useState(false)
-  const [error,    setError]    = useState('')
+  const [modo,         setModo]         = useState('login')
+  const [email,        setEmail]        = useState('')
+  const [pass,         setPass]         = useState('')
+  const [loading,      setLoading]      = useState(false)
+  const [loadingG,     setLoadingG]     = useState(false)
+  const [error,        setError]        = useState('')
+  const [resetSent,    setResetSent]    = useState(false)
+  const [loadingReset, setLoadingReset] = useState(false)
 
   const handleSubmit = async () => {
     setError('')
@@ -77,10 +80,25 @@ export default function LoginScreen({ onLogin, onVolver }) {
     }
   }
 
+  const handleForgotPassword = async () => {
+    setError('')
+    if (!email.trim()) return setError('Ingresa tu correo para restablecer la contraseña')
+    setLoadingReset(true)
+    try {
+      await sendPasswordResetEmail(auth, email.trim())
+      setResetSent(true)
+    } catch (e) {
+      setError(getErrorMsg(e.code))
+    } finally {
+      setLoadingReset(false)
+    }
+  }
+
   const cambiarModo = (nuevoModo) => {
     setModo(nuevoModo)
     setError('')
     setPass('')
+    setResetSent(false)
   }
 
   const inputStyle = {
@@ -167,6 +185,23 @@ export default function LoginScreen({ onLogin, onVolver }) {
             disabled={loading || loadingG}
             onKeyDown={e => e.key === 'Enter' && !loading && handleSubmit()}
             style={{ ...inputStyle, marginBottom:6 }} />
+
+          {/* Olvidé contraseña — solo en modo login */}
+          {modo === 'login' && (
+            <div style={{ textAlign:'right', marginBottom:8 }}>
+              <span
+                onClick={!loadingReset ? handleForgotPassword : undefined}
+                style={{ fontSize:12, color:C.teal, fontWeight:700, cursor:'pointer', opacity:loadingReset?0.5:1 }}>
+                {loadingReset ? 'Enviando...' : '¿Olvidaste tu contraseña?'}
+              </span>
+            </div>
+          )}
+
+          {resetSent && (
+            <p style={{ fontSize:13, color:'#22C55E', marginBottom:10, fontWeight:600 }}>
+              ✓ Revisa tu correo — te enviamos el enlace de restablecimiento
+            </p>
+          )}
 
           {error && (
             <p style={{ fontSize:13, color:C.red, marginBottom:10, fontWeight:600 }}>⚠ {error}</p>

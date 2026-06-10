@@ -9,6 +9,7 @@ import 'leaflet/dist/leaflet.css'
 import App from './App.jsx'
 import { ConfigProvider } from './context/ConfigContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import ErrorBoundary from './components/shared/ErrorBoundary.jsx'
 
 const root = document.getElementById('root')
 
@@ -18,10 +19,12 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <ConfigProvider>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </ConfigProvider>
+    <ErrorBoundary>
+      <ConfigProvider>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </ConfigProvider>
+    </ErrorBoundary>
   </StrictMode>
 )

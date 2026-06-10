@@ -145,7 +145,7 @@ export async function setupUsuarioNuevo(user) {
     nivel: 'alto', deuda: 0, limiteCredito: 500,
     condicionPago: '30 días', ruc: '', veterinario: 'Dr. García',
     tipoEstablecimiento: 'Clínica',
-    lat: 10.48, lng: -66.87, foto: null,
+    lat: null, lng: null, foto: null,
     vendedorId: uid, tenantId: uid, activo: true,
     ultimaVisita: serverTimestamp(), creadoEn: serverTimestamp(),
   })

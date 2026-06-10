@@ -11,7 +11,7 @@ import Badge from '../shared/Badge'
 import Button from '../shared/Button'
 
 export default function ClientsScreen({ nav }) {
-  const { clientes, inventario, loading } = useAppData()
+  const { clientes, inventario, loading, error: dataError, recargar } = useAppData()
   const { config }                        = useConfig()
   const [search, setSearch] = useState('')
   const [tipo,   setTipo]   = useState('todos')
@@ -46,6 +46,12 @@ export default function ClientsScreen({ nav }) {
 
   return (
     <div className="screen-enter" style={{ background:C.gray50, minHeight:'100vh' }}>
+      {dataError && (
+        <div style={{ background:'#FEE2E2', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+          <p style={{ fontSize:13, color:'#991B1B', fontWeight:600, margin:0 }}>⚠ Error cargando clientes</p>
+          <button onClick={recargar} style={{ fontSize:12, color:'#991B1B', fontWeight:800, background:'none', border:'1px solid #991B1B', borderRadius:8, padding:'4px 10px', cursor:'pointer', fontFamily:'inherit' }}>Reintentar</button>
+        </div>
+      )}
       <div style={{ background:C.navy, padding:'20px 14px 14px', color:'#fff' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
           <h1 style={{ fontSize:20, fontWeight:900, margin:0 }}>Clientes</h1>
