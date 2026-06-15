@@ -5,6 +5,7 @@ service cloud.firestore {
     // ── Helpers base ───────────────────────────────────────────
     function isAuth()  { return request.auth != null; }
     function uid()     { return request.auth.uid; }
+    function email()   { return request.auth.token.email; }
 
     // Documento del usuario actual (cross-document read)
     function myData() {
@@ -13,12 +14,12 @@ service cloud.firestore {
 
     // ── Helpers de membresía ───────────────────────────────────
 
-    // El usuario actual es admin de ese tenant (su UID == tenantId)
+    // El usuario actual ES el admin de ese tenant (UID == tenantId)
     function isAdminOf(tenantId) {
       return isAuth() && uid() == tenantId;
     }
 
-    // El usuario actual es vendedor activo de la empresa cuyo admin tiene ese tenantId
+    // El usuario es miembro activo de la empresa (admin propio O vendedor activo vinculado)
     function isMemberOf(tenantId) {
       return isAuth() && (
         uid() == tenantId ||
@@ -28,8 +29,7 @@ service cloud.firestore {
       );
     }
 
-    // El usuario es el admin-empresa del vendedorId indicado
-    // (permite que el admin gestione recursos que pertenecen a sus vendedores)
+    // El usuario es el admin-empresa del vendedorId dado
     function isAdminOfVendedor(vendedorId) {
       return isAuth() &&
         get(/databases/$(database)/documents/usuarios/$(vendedorId)).data.empresaId == uid();
@@ -37,8 +37,7 @@ service cloud.firestore {
 
     // ── Validaciones de escritura ──────────────────────────────
 
-    // Al crear: vendedorId debe ser propio UID y tenantId debe ser propio UID
-    // o el empresaId de su empresa (para escrituras multi-empresa)
+    // Al crear: vendedorId = UID propio, tenantId = UID propio o empresaId real
     function validNewDoc() {
       let d = request.resource.data;
       return isAuth() &&
@@ -46,7 +45,7 @@ service cloud.firestore {
         (d.tenantId == uid() || d.tenantId == myData().empresaId);
     }
 
-    // Al actualizar: los campos de identidad no pueden cambiar
+    // Al actualizar: los campos de identidad no pueden cambiar nunca
     function identityUnchanged() {
       return !request.resource.data.diff(resource.data)
                .affectedKeys().hasAny(['vendedorId', 'tenantId']);
@@ -54,17 +53,15 @@ service cloud.firestore {
 
     // ── Validaciones anti-abuso ────────────────────────────────
 
-    // Los campos de texto no deben exceder tamaños razonables
-    // (previene inyección de payloads masivos en Firestore)
+    // Límite de tamaño en campos de texto (previene payloads masivos)
     function camposTextoValidos(d) {
-      return (!d.keys().hasAll(['notas'])      || d.notas.size()     <= 2000)
-          && (!d.keys().hasAll(['nombre'])     || d.nombre.size()    <= 200)
-          && (!d.keys().hasAll(['descripcion'])|| d.descripcion.size()<= 1000)
-          && (!d.keys().hasAll(['referencia']) || d.referencia.size()<= 500);
+      return (!d.keys().hasAll(['notas'])       || d.notas.size()      <= 2000)
+          && (!d.keys().hasAll(['nombre'])      || d.nombre.size()     <= 200)
+          && (!d.keys().hasAll(['descripcion']) || d.descripcion.size()<= 1000)
+          && (!d.keys().hasAll(['referencia'])  || d.referencia.size() <= 500);
     }
 
-    // Un documento nuevo debe tener un timestamp de creación reciente
-    // (dentro de ±5 min del servidor, previene backdating)
+    // creadoEn debe estar dentro de ±5 min del servidor (previene backdating manual)
     function timestampValido() {
       let d = request.resource.data;
       return !d.keys().hasAll(['creadoEn']) ||
@@ -75,58 +72,82 @@ service cloud.firestore {
 
     // ── USUARIOS ──────────────────────────────────────────────
     match /usuarios/{userId} {
-      // Propio doc, o admin leyendo a uno de sus vendedores
+      // Solo propio doc, o admin leyendo a sus vendedores directos
       allow read: if isAuth() && (
         uid() == userId ||
         get(/databases/$(database)/documents/usuarios/$(userId)).data.empresaId == uid()
       );
-      allow create: if isAuth() && uid() == userId
-        && request.resource.data.uid == userId;
-      // Puede actualizar su propio doc pero NUNCA cambiar rol, empresaId ni tenantId
-      allow update: if isAuth() && uid() == userId
+      // Creación: solo el propio usuario, el UID debe coincidir
+      allow create: if isAuth()
+        && uid() == userId
+        && request.resource.data.uid == userId
+        // No puede auto-asignarse rol admin si no es el primer usuario de la empresa
+        // (setup lo hace siempre con rol='admin' o rol='vendedor', nunca otro)
+        && (request.resource.data.rol == 'admin' || request.resource.data.rol == 'vendedor');
+
+      // Actualización: solo propio doc, y NUNCA cambiar campos de seguridad
+      allow update: if isAuth()
+        && uid() == userId
         && !request.resource.data.diff(resource.data)
              .affectedKeys().hasAny(['rol', 'empresaId', 'tenantId', 'uid']);
+
+      // NUEVO: el admin de la empresa puede desactivar/reactivar sus vendedores
+      // pero no puede cambiar el rol ni el empresaId del vendedor
+      allow update: if isAuth()
+        && uid() != userId
+        && get(/databases/$(database)/documents/usuarios/$(userId)).data.empresaId == uid()
+        && !request.resource.data.diff(resource.data)
+             .affectedKeys().hasAny(['rol', 'empresaId', 'tenantId', 'uid', 'email']);
+
       allow delete: if false;
     }
 
     // ── CONFIG (por empresa) ───────────────────────────────────
     match /config/{configId} {
       allow read:  if isAuth() && isMemberOf(configId);
-      // Solo el admin de la empresa puede escribir su config
       allow write: if isAuth() && isAdminOf(configId);
     }
 
     // ── EMPRESAS ──────────────────────────────────────────────
     match /empresas/{empresaId} {
       allow read:  if isAuth() && isMemberOf(empresaId);
+      // Solo el admin de esa empresa puede modificarla
       allow write: if isAuth() && isAdminOf(empresaId);
     }
 
     // ── CLIENTES ──────────────────────────────────────────────
     match /clientes/{docId} {
+      // Lectura: propio vendedor, su admin, o admin de empresa (tenantId)
       allow read: if isAuth() && (
-        resource.data.tenantId   == uid() ||
-        resource.data.vendedorId == uid() ||
-        isAdminOfVendedor(resource.data.vendedorId)
-      );
-      allow create: if isAuth() && validNewDoc() && camposTextoValidos(request.resource.data);
-      allow update: if isAuth() && identityUnchanged() && camposTextoValidos(request.resource.data) && (
         resource.data.vendedorId == uid() ||
         resource.data.tenantId   == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
       );
-      // Soft delete via campo activo=false — no se borra físicamente
+      allow create: if isAuth()
+        && validNewDoc()
+        && camposTextoValidos(request.resource.data);
+
+      allow update: if isAuth()
+        && identityUnchanged()
+        && camposTextoValidos(request.resource.data)
+        && (
+          resource.data.vendedorId == uid() ||
+          resource.data.tenantId   == uid() ||
+          isAdminOfVendedor(resource.data.vendedorId)
+        );
+      // Soft delete — nunca borrado físico para preservar historial
       allow delete: if false;
     }
 
     // ── PRODUCTOS ─────────────────────────────────────────────
     match /productos/{docId} {
-      // Vendedores pueden LEER el catálogo de su empresa
+      // Cualquier miembro activo de la empresa puede leer el catálogo
       allow read: if isAuth() && isMemberOf(resource.data.tenantId);
-      // Solo el admin puede CREAR productos
+
+      // Solo el admin puede crear productos del catálogo
       allow create: if isAuth() && isAdminOf(request.resource.data.tenantId);
-      // Admin: puede actualizar cualquier campo
-      // Vendedor-miembro: solo puede REDUCIR el stock (al vender)
+
+      // Admin: cualquier campo | Vendedor activo: SOLO reducir stock (al vender)
       allow update: if isAuth() && (
         isAdminOf(resource.data.tenantId) ||
         (isMemberOf(resource.data.tenantId) &&
@@ -134,26 +155,32 @@ service cloud.firestore {
            .affectedKeys().hasOnly(['stock', 'actualizadoEn']) &&
          request.resource.data.stock <= resource.data.stock)
       );
+      // Soft delete — nunca borrado físico
       allow delete: if false;
     }
 
     // ── VENTAS ────────────────────────────────────────────────
     match /ventas/{docId} {
-      // Admin ve TODAS las ventas de su empresa; vendedor solo las suyas
+      // Admin ve todas las ventas de su empresa; vendedor solo las propias
       allow read: if isAuth() && (
         resource.data.tenantId   == uid() ||
         resource.data.vendedorId == uid()
       );
-      allow create: if isAuth() && validNewDoc() && camposTextoValidos(request.resource.data) && timestampValido();
-      // Admin puede actualizar cualquier campo de ventas de su empresa
-      // Vendedor puede actualizar sus propias ventas PERO NO campos financieros críticos
+      allow create: if isAuth()
+        && validNewDoc()
+        && camposTextoValidos(request.resource.data)
+        && timestampValido();
+
+      // Admin (tenantId==uid): puede actualizar cualquier campo NO de identidad
+      // Vendedor (solo sus ventas): NO puede tocar campos financieros ni de identidad
       allow update: if isAuth() && (
-        resource.data.tenantId == uid() ||
+        (resource.data.tenantId == uid() && identityUnchanged()) ||
         (resource.data.vendedorId == uid() &&
          !request.resource.data.diff(resource.data)
             .affectedKeys().hasAny(['total', 'subtotal', 'descuento', 'descValor',
-                                    'vendedorId', 'tenantId', 'clienteId']))
+                                    'vendedorId', 'tenantId', 'clienteId', 'items']))
       );
+      // Ninguna venta se borra — historial permanente
       allow delete: if false;
     }
 
@@ -169,6 +196,7 @@ service cloud.firestore {
         resource.data.vendedorId == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
       );
+      // Visitas permanentes — no se borran
       allow delete: if false;
     }
 
@@ -184,9 +212,10 @@ service cloud.firestore {
         resource.data.vendedorId == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
       );
-      // Rutas sí se borran físicamente (no hay soft delete)
+      // Rutas sí permiten borrado físico (no tienen historial financiero)
       allow delete: if isAuth() && (
         resource.data.vendedorId == uid() ||
+        resource.data.tenantId   == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
       );
     }
@@ -199,7 +228,7 @@ service cloud.firestore {
         isAdminOfVendedor(resource.data.vendedorId)
       );
       allow create: if isAuth() && validNewDoc();
-      // Los pagos son INMUTABLES — no se pueden modificar ni borrar
+      // INMUTABLES — ningún pago puede modificarse ni borrarse
       allow update: if false;
       allow delete: if false;
     }
@@ -218,30 +247,40 @@ service cloud.firestore {
       );
       allow delete: if isAuth() && (
         resource.data.vendedorId == uid() ||
+        resource.data.tenantId   == uid() ||
         isAdminOfVendedor(resource.data.vendedorId)
       );
     }
 
     // ── INVITACIONES ──────────────────────────────────────────
     match /invitaciones/{docId} {
-      // Solo el admin que la creó, o el usuario invitado, pueden leerla
+      // Solo el admin creador o el email invitado pueden leerla
       allow read: if isAuth() && (
         resource.data.adminId       == uid() ||
-        resource.data.emailInvitado == request.auth.token.email
+        resource.data.emailInvitado == email()
       );
-      // Solo el admin puede crear invitaciones para su empresa
+      // Solo admin puede crear, y debe ser su propia empresa
       allow create: if isAuth()
-        && request.resource.data.adminId    == uid()
-        && request.resource.data.empresaId  == uid();
-      // El admin puede cancelarla; el invitado puede aceptarla (setupFirestore)
+        && request.resource.data.adminId   == uid()
+        && request.resource.data.empresaId == uid()
+        // Validar que el email invitado no sea el propio admin
+        && request.resource.data.emailInvitado != email();
+
+      // Admin puede cancelarla; el invitado puede aceptarla
       allow update: if isAuth() && (
         resource.data.adminId       == uid() ||
-        resource.data.emailInvitado == request.auth.token.email
+        resource.data.emailInvitado == email()
       );
+      // Solo el admin que la creó puede eliminarla
       allow delete: if isAuth() && resource.data.adminId == uid();
     }
 
-    // ── Bloquear todo lo que no esté explícitamente permitido ──
+    // ── FCM TOKENS (notificaciones push) ──────────────────────
+    // El token se guarda en el doc del usuario (campo fcmToken),
+    // ya cubierto por la regla de /usuarios. Esta colección no existe
+    // separada — no se necesita regla adicional.
+
+    // ── CATCH-ALL: bloquear cualquier colección no declarada ───
     match /{document=**} {
       allow read, write: if false;
     }

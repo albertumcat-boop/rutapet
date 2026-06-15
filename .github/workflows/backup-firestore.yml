@@ -1,0 +1,109 @@
+name: 🗄️ Backup Firestore Diario
+
+on:
+  schedule:
+    # Todos los días a las 03:00 UTC (11pm Venezuela / medianoche Colombia)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # También se puede lanzar manualmente desde GitHub → Actions → Run workflow
+
+jobs:
+  backup:
+    name: Exportar colecciones de Firestore
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # ── 1. Clonar repo (para guardar el JSON del respaldo) ──────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Instalar Node + Firebase Admin SDK ──────────────────────
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar firebase-admin
+        run: npm install firebase-admin
+
+      # ── 3. Crear el script de exportación ──────────────────────────
+      - name: Escribir script de backup
+        run: |
+          cat > backup_script.mjs << 'SCRIPT_EOF'
+          import { initializeApp, cert } from 'firebase-admin/app'
+          import { getFirestore }         from 'firebase-admin/firestore'
+          import { writeFileSync, mkdirSync } from 'fs'
+          import { join }  from 'path'
+
+          // Autenticar con Service Account (inyectada como secret)
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+          initializeApp({ credential: cert(serviceAccount) })
+          const db = getFirestore()
+
+          // Colecciones a respaldar (todas las relevantes del negocio)
+          const COLLECTIONS = [
+            'usuarios',
+            'empresas',
+            'config',
+            'clientes',
+            'productos',
+            'ventas',
+            'visitas',
+            'rutas',
+            'pagos',
+            'inventario',
+            'invitaciones',
+          ]
+
+          const today   = new Date().toISOString().slice(0, 10)   // YYYY-MM-DD
+          const outDir  = join('backups', today)
+          mkdirSync(outDir, { recursive: true })
+
+          let totalDocs = 0
+
+          for (const col of COLLECTIONS) {
+            console.log(`⬇️  Exportando ${col}...`)
+            const snap = await db.collection(col).get()
+            const docs = {}
+            snap.forEach(doc => { docs[doc.id] = doc.data() })
+            const outPath = join(outDir, `${col}.json`)
+            writeFileSync(outPath, JSON.stringify(docs, null, 2), 'utf8')
+            console.log(`   ✅ ${snap.size} documentos → ${outPath}`)
+            totalDocs += snap.size
+          }
+
+          // Crear índice del respaldo
+          const index = {
+            fecha:       new Date().toISOString(),
+            colecciones: COLLECTIONS,
+            totalDocs,
+          }
+          writeFileSync(join(outDir, '_index.json'), JSON.stringify(index, null, 2))
+          console.log(`\n🎉 Backup completo: ${totalDocs} documentos en ${outDir}`)
+          SCRIPT_EOF
+
+      # ── 4. Ejecutar el backup ───────────────────────────────────────
+      - name: Ejecutar backup
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node backup_script.mjs
+
+      # ── 5. Subir como artifact de GitHub (retención 90 días) ───────
+      - name: Subir backup como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 90
+          if-no-files-found: error
+
+      # ── 6. Notificar resultado en el commit ──────────────────────────
+      - name: Resumen del backup
+        run: |
+          echo "## 🗄️ Backup Firestore completado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Fecha:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Archivos generados:**" >> $GITHUB_STEP_SUMMARY
+          ls -lh backups/$(date -u '+%Y-%m-%d')/ | awk '{print "- " $NF " (" $5 ")"}' >> $GITHUB_STEP_SUMMARY
