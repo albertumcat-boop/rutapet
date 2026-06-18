@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { C, nivelBg, nivelTxt, estadoPagoInfo, metodoPagoLabel } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
-import { actualizarCliente, eliminarCliente, actualizarVenta, setInventarioProducto, calcularPorcentajeInventario, colorPorcentaje, labelPorcentaje } from '../../services/firestore'
+import { actualizarCliente, eliminarCliente, marcarVentaPagada, setInventarioProducto, calcularPorcentajeInventario, colorPorcentaje, labelPorcentaje } from '../../services/firestore'
 import { fmtUSD, daysSince, fmtFecha } from '../../utils/helpers'
 import { imprimirRemision } from '../../utils/pdfPrint'
 import Icon from '../shared/Icon'
@@ -96,11 +96,9 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
     if (!confirm(`¿Marcar como pagado? Se acreditarán ${fmtUSD(pendiente)} a la cuenta del cliente.`)) return
     setMarkingPaid(venta.id)
     try {
-      // Actualizar estado de la venta
-      await actualizarVenta(venta.id, { estado: 'pagado', montoPagado: venta.total })
-      // Reducir deuda del cliente
-      const nuevaDeuda = Math.max(0, (c.deuda || 0) - pendiente)
-      await actualizarCliente(c.id, { deuda: nuevaDeuda })
+      // Atómico: actualiza venta + reduce deuda real (leída en el servidor,
+      // no el valor local cacheado) en una sola transacción
+      await marcarVentaPagada(venta.id, c.id)
       recargar()
     } catch (err) {
       alert('Error: ' + err.message)

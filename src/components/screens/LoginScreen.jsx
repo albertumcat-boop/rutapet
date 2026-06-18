@@ -27,6 +27,7 @@ const ERROR_MESSAGES = {
   'auth/cancelled-popup-request':'Solicitud cancelada',
   'auth/network-request-failed':'Sin conexión a internet',
   'auth/too-many-requests':     'Demasiados intentos. Intenta en unos minutos',
+  'auth/user-disabled':         'Tu cuenta ha sido deshabilitada. Contacta al administrador',
 }
 
 const getErrorMsg = (code) => ERROR_MESSAGES[code] || 'Ocurrió un error. Intenta de nuevo'

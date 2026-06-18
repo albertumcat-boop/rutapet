@@ -70,6 +70,19 @@ service cloud.firestore {
          d.creadoEn <= request.time + duration.value(60,  's'));
     }
 
+    // Coherencia matemática mínima de una venta: total/subtotal no negativos,
+    // y total == subtotal - descValor (con tolerancia de punto flotante).
+    // Previene que un vendedor registre, llamando directo al SDK, una venta
+    // de items costosos con un total artificialmente bajo (o negativo).
+    function montoVentaValido() {
+      let d = request.resource.data;
+      return d.total is number && d.total >= 0
+        && d.subtotal is number && d.subtotal >= 0
+        && d.descValor is number && d.descValor >= 0
+        && (d.total - (d.subtotal - d.descValor) < 0.02)
+        && ((d.subtotal - d.descValor) - d.total < 0.02);
+    }
+
     // ── USUARIOS ──────────────────────────────────────────────
     match /usuarios/{userId} {
       // Solo propio doc, o admin leyendo a sus vendedores directos
@@ -91,13 +104,15 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data)
              .affectedKeys().hasAny(['rol', 'empresaId', 'tenantId', 'uid']);
 
-      // NUEVO: el admin de la empresa puede desactivar/reactivar sus vendedores
-      // pero no puede cambiar el rol ni el empresaId del vendedor
+      // El admin de la empresa puede desactivar/reactivar sus vendedores.
+      // SECURITY: whitelist explícita (no lista negra) — el admin SOLO puede
+      // tocar 'activo' y 'actualizadoEn'. Cualquier campo nuevo que se agregue
+      // a /usuarios en el futuro queda protegido por defecto.
       allow update: if isAuth()
         && uid() != userId
         && get(/databases/$(database)/documents/usuarios/$(userId)).data.empresaId == uid()
-        && !request.resource.data.diff(resource.data)
-             .affectedKeys().hasAny(['rol', 'empresaId', 'tenantId', 'uid', 'email']);
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['activo', 'actualizadoEn']);
 
       allow delete: if false;
     }
@@ -127,9 +142,19 @@ service cloud.firestore {
         && validNewDoc()
         && camposTextoValidos(request.resource.data);
 
+      // SECURITY: si 'deuda' cambia, SOLO puede ir acompañado de
+      // 'actualizadoEn'/'ultimaVisita' (los campos que tocan las
+      // transacciones atómicas en agregarVenta/registrarPago/marcarVentaPagada).
+      // Esto bloquea que alguien actualice 'deuda' junto con campos de texto
+      // arbitrarios desde una llamada manual fuera de esos flujos auditados.
       allow update: if isAuth()
         && identityUnchanged()
         && camposTextoValidos(request.resource.data)
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['deuda']) ||
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['deuda', 'actualizadoEn', 'ultimaVisita'])
+        )
         && (
           resource.data.vendedorId == uid() ||
           resource.data.tenantId   == uid() ||
@@ -147,13 +172,16 @@ service cloud.firestore {
       // Solo el admin puede crear productos del catálogo
       allow create: if isAuth() && isAdminOf(request.resource.data.tenantId);
 
-      // Admin: cualquier campo | Vendedor activo: SOLO reducir stock (al vender)
+      // Admin: cualquier campo | Vendedor activo: SOLO reducir stock (al vender),
+      // y el stock resultante nunca puede quedar negativo (defensa en profundidad —
+      // el cliente también valida esto en una transacción antes de escribir).
       allow update: if isAuth() && (
         isAdminOf(resource.data.tenantId) ||
         (isMemberOf(resource.data.tenantId) &&
          request.resource.data.diff(resource.data)
            .affectedKeys().hasOnly(['stock', 'actualizadoEn']) &&
-         request.resource.data.stock <= resource.data.stock)
+         request.resource.data.stock <= resource.data.stock &&
+         request.resource.data.stock >= 0)
       );
       // Soft delete — nunca borrado físico
       allow delete: if false;
@@ -169,7 +197,8 @@ service cloud.firestore {
       allow create: if isAuth()
         && validNewDoc()
         && camposTextoValidos(request.resource.data)
-        && timestampValido();
+        && timestampValido()
+        && montoVentaValido();
 
       // Admin (tenantId==uid): puede actualizar cualquier campo NO de identidad
       // Vendedor (solo sus ventas): NO puede tocar campos financieros ni de identidad

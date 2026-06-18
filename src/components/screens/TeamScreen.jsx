@@ -11,6 +11,7 @@ import {
   obtenerMiembrosEquipo,
   invitarVendedor,
   obtenerInvitacionesPendientes,
+  setActivoVendedor,
 } from '../../services/firestore'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
@@ -35,6 +36,7 @@ export default function TeamScreen({ onBack }) {
   const [showInvite,   setShowInvite]   = useState(false)
   const [email,        setEmail]        = useState('')
   const [sending,      setSending]      = useState(false)
+  const [togglingId,   setTogglingId]   = useState(null)
 
   const empId = empresaId || user?.uid
 
@@ -76,6 +78,23 @@ export default function TeamScreen({ onBack }) {
       toast.error(err.message)
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleToggleActivo = async (m) => {
+    if (m.id === user?.uid) return // no puede desactivarse a sí mismo
+    const nuevoEstado = m.activo === false ? true : false
+    const verbo = nuevoEstado ? 'reactivar' : 'desactivar'
+    if (!confirm(`¿${verbo.charAt(0).toUpperCase() + verbo.slice(1)} a ${m.nombre || m.email}?`)) return
+    setTogglingId(m.id)
+    try {
+      await setActivoVendedor(m.id, nuevoEstado)
+      setMiembros(prev => prev.map(x => x.id === m.id ? { ...x, activo: nuevoEstado } : x))
+      toast.success(nuevoEstado ? 'Vendedor reactivado' : 'Vendedor desactivado — se cerrará su sesión automáticamente')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -147,9 +166,10 @@ export default function TeamScreen({ onBack }) {
               const rolInfo = ROL_INFO[m.rol] || ROL_INFO.vendedor
               const initials = (m.nombre || m.email || '?').slice(0, 2).toUpperCase()
               const isMe = m.id === user?.uid
+              const inactivo = m.activo === false
 
               return (
-                <Card key={m.id} style={{ marginBottom: 8 }}>
+                <Card key={m.id} style={{ marginBottom: 8, opacity: inactivo ? 0.6 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Avatar initials={initials} size={44} bg={m.rol === 'admin' ? '#6D28D9' : C.teal} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -160,9 +180,28 @@ export default function TeamScreen({ onBack }) {
                         {isMe && <Badge bg="#DCFCE7" txt="#166534">Tú</Badge>}
                       </div>
                       <p style={{ fontSize: 11, color: C.gray400, margin: '2px 0' }}>{m.email || '—'}</p>
-                      <Badge bg={rolInfo.bg} txt={rolInfo.txt}>{rolInfo.label}</Badge>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Badge bg={rolInfo.bg} txt={rolInfo.txt}>{rolInfo.label}</Badge>
+                        {inactivo && <Badge bg="#FEE2E2" txt="#991B1B">Desactivado</Badge>}
+                      </div>
                     </div>
-                    <Icon name={rolInfo.icon} size={18} color={rolInfo.txt} />
+                    {m.rol === 'vendedor' && !isMe ? (
+                      <button
+                        onClick={() => handleToggleActivo(m)}
+                        disabled={togglingId === m.id}
+                        style={{
+                          background: inactivo ? '#DCFCE7' : '#FEE2E2',
+                          color:      inactivo ? '#166534' : '#991B1B',
+                          border: 'none', borderRadius: 10, padding: '6px 10px',
+                          fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: 'inherit', whiteSpace: 'nowrap',
+                          opacity: togglingId === m.id ? 0.6 : 1,
+                        }}>
+                        {togglingId === m.id ? '...' : (inactivo ? 'Reactivar' : 'Desactivar')}
+                      </button>
+                    ) : (
+                      <Icon name={rolInfo.icon} size={18} color={rolInfo.txt} />
+                    )}
                   </div>
                 </Card>
               )

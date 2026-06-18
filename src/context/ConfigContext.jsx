@@ -69,6 +69,16 @@ export function ConfigProvider({ children }) {
             return
           }
 
+          // Si el documento del usuario fue eliminado (ej. por un operador
+          // usando el Admin SDK/consola — el cliente nunca puede borrarlo
+          // directamente porque las reglas tienen delete:false) → cerrar sesión
+          // en vez de dejarlo en un estado vacío/confuso con rol=null.
+          if (userData === null) {
+            console.warn('ConfigContext: documento de usuario no existe — cerrando sesión')
+            await signOut(auth)
+            return
+          }
+
           const rol    = userData?.rol       || null
           const empId  = userData?.empresaId || null
           const configId = (rol === 'vendedor' && empId) ? empId : tid

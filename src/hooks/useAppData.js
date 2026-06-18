@@ -16,6 +16,7 @@ import {
   suscribirClientes,
   suscribirVentas,
   suscribirProductos,
+  suscribirVisitas,
 } from '../services/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -44,8 +45,8 @@ export function useAppData() {
   const [error,   setError]   = useState(null)
 
   // Referencias a datos en tiempo real para combinar con equipo
-  const propiosRef = useRef({ clientes: [], ventas: [], productos: [] })
-  const equipoRef  = useRef({ clientes: [], ventas: [] })
+  const propiosRef = useRef({ clientes: [], ventas: [], productos: [], visitas: [] })
+  const equipoRef  = useRef({ clientes: [], ventas: [], visitas: [] })
   const mountedRef = useRef(true)
 
   // Merge helper — combina propios + equipo y retorna datos completos
@@ -55,6 +56,7 @@ export function useAppData() {
       ...prev,
       clientes:  uniq([...propiosRef.current.clientes, ...equipoRef.current.clientes]),
       ventas:    uniq([...propiosRef.current.ventas,   ...equipoRef.current.ventas  ]),
+      visitas:   uniq([...propiosRef.current.visitas,  ...equipoRef.current.visitas ]),
       productos: propiosRef.current.productos,
       ...overrides,
     }))
@@ -72,8 +74,8 @@ export function useAppData() {
       unsubs.length = 0
 
       if (!user) {
-        propiosRef.current = { clientes: [], ventas: [], productos: [] }
-        equipoRef.current  = { clientes: [], ventas: [] }
+        propiosRef.current = { clientes: [], ventas: [], productos: [], visitas: [] }
+        equipoRef.current  = { clientes: [], ventas: [], visitas: [] }
         setData(EMPTY_DATA)
         setLoading(false)
         setError(null)
@@ -112,6 +114,12 @@ export function useAppData() {
           setLoading(false) // primer snapshot = datos disponibles
         }))
 
+        // Visitas propias — tiempo real (antes era fetch único, quedaba desfasado)
+        unsubs.push(suscribirVisitas(user.uid, visitas => {
+          propiosRef.current.visitas = visitas
+          merge()
+        }))
+
         // ── One-time fetch para colecciones menos críticas ────
         const [rutas, inventario] = await Promise.all([
           obtenerRutas(),
@@ -140,22 +148,15 @@ export function useAppData() {
               )
               equipoRef.current.clientes = uniq(resultados.flatMap(r => r.clientes))
               equipoRef.current.ventas   = uniq(resultados.flatMap(r => r.ventas))
-              const todasVisitas         = uniq(resultados.flatMap(r => r.visitas))
+              equipoRef.current.visitas  = uniq(resultados.flatMap(r => r.visitas))
               if (mountedRef.current) {
-                setData(prev => ({ ...prev, visitas: todasVisitas, equipo }))
+                setData(prev => ({ ...prev, equipo }))
                 merge()
               }
             }
           } catch (err) {
             console.warn('useAppData: no se pudo cargar equipo:', err)
           }
-        }
-
-        // Visitas propias (one-time, no cambian en tiempo real con frecuencia)
-        const { obtenerVisitas } = await import('../services/firestore')
-        const visitas = await obtenerVisitas()
-        if (mountedRef.current) {
-          setData(prev => ({ ...prev, visitas: uniq([...visitas, ...(prev.visitas || [])]) }))
         }
 
       } catch (err) {

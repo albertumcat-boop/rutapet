@@ -1,0 +1,47 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "invitaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emailInvitado", "order": "ASCENDING" },
+        { "fieldPath": "empresaId",     "order": "ASCENDING" },
+        { "fieldPath": "estado",        "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invitaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empresaId", "order": "ASCENDING" },
+        { "fieldPath": "estado",    "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vendedorId", "order": "ASCENDING" },
+        { "fieldPath": "clienteId",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inventario",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId",  "order": "ASCENDING" },
+        { "fieldPath": "vendedorId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inventario",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId",  "order": "ASCENDING" },
+        { "fieldPath": "productoId", "order": "ASCENDING" },
+        { "fieldPath": "vendedorId", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

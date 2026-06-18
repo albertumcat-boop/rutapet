@@ -7,7 +7,7 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc,
   getDocs, getDoc, setDoc, query, where,
   serverTimestamp, orderBy, limit,
-  increment, onSnapshot,
+  increment, onSnapshot, runTransaction,
 } from 'firebase/firestore'
 import { db, auth } from '../../firebase/firebase.config'
 
@@ -69,6 +69,18 @@ export const obtenerMiembrosEquipo = async (empresaId) => {
   const q    = query(col('usuarios'), where('empresaId', '==', empresaId))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+// Admin: activar/desactivar a un vendedor de su equipo.
+// Las reglas de Firestore solo permiten que el admin toque 'activo' y
+// 'actualizadoEn' en el doc de OTRO usuario — ningún otro campo es editable.
+export const setActivoVendedor = async (vendedorId, activo) => {
+  requireAuth()
+  if (!vendedorId) throw new Error('vendedorId requerido')
+  await updateDoc(docRef('usuarios', vendedorId), {
+    activo: Boolean(activo),
+    actualizadoEn: serverTimestamp(),
+  })
 }
 
 // ── INVITACIONES ──────────────────────────────────────
@@ -182,8 +194,13 @@ export const obtenerClientesEmpresa = async (empresaId) => {
 export const actualizarCliente = async (id, data) => {
   requireAuth()
   if (!id) throw new Error('ID de cliente requerido')
+  // SECURITY: 'deuda' fue removido intencionalmente de esta whitelist.
+  // El saldo del cliente SOLO debe cambiar a través de flujos atómicos y
+  // auditados: agregarVenta(), registrarPago() o marcarVentaPagada().
+  // Permitir su edición libre aquí abriría la puerta a que un vendedor
+  // infle o borre deuda sin dejar rastro en /pagos.
   const permitidos = ['nombre','tipo','contacto','telefono','email',
-    'direccion','notas','nivel','deuda','limiteCredito','condicionPago',
+    'direccion','notas','nivel','limiteCredito','condicionPago',
     'ruc','veterinario','tipoEstablecimiento',
     'lat','lng','foto','activo','ultimaVisita']
   const update = {}
@@ -192,6 +209,42 @@ export const actualizarCliente = async (id, data) => {
   }
   update.actualizadoEn = serverTimestamp()
   await updateDoc(docRef('clientes', id), update)
+}
+
+// Marca una venta como totalmente pagada y reduce la deuda del cliente
+// en el monto pendiente — TODO en una sola transacción atómica para que
+// dos usuarios marcando ventas pagadas simultáneamente no se pisen.
+export const marcarVentaPagada = async (ventaId, clienteId) => {
+  requireAuth()
+  if (!ventaId)   throw new Error('ventaId requerido')
+  if (!clienteId) throw new Error('clienteId requerido')
+
+  const ventaRef   = docRef('ventas', ventaId)
+  const clienteRef = docRef('clientes', clienteId)
+
+  return await runTransaction(db, async (tx) => {
+    const ventaSnap   = await tx.get(ventaRef)
+    const clienteSnap = await tx.get(clienteRef)
+    if (!ventaSnap.exists())   throw new Error('Venta no encontrada')
+    if (!clienteSnap.exists()) throw new Error('Cliente no encontrado')
+
+    const venta     = ventaSnap.data()
+    const deudaReal  = Number(clienteSnap.data().deuda) || 0
+    const pendiente  = Math.max(0, Number(venta.total || 0) - Number(venta.montoPagado || 0))
+    const nuevaDeuda = Math.max(0, deudaReal - pendiente)
+
+    tx.update(ventaRef, {
+      estado:        'pagado',
+      montoPagado:   Number(venta.total) || 0,
+      actualizadoEn: serverTimestamp(),
+    })
+    tx.update(clienteRef, {
+      deuda:         nuevaDeuda,
+      actualizadoEn: serverTimestamp(),
+    })
+
+    return nuevaDeuda
+  })
 }
 
 export const eliminarCliente = async (id) => {
@@ -313,6 +366,10 @@ export const obtenerProductosPorVencer = async (diasAlerta = 90) => {
 }
 
 // ── VENTAS ────────────────────────────────────────────
+// agregarVenta es ATÓMICA: la venta, el descuento de stock y el incremento
+// de deuda ocurren todos dentro de una sola transacción de Firestore.
+// Si el stock de algún producto es insuficiente, TODA la operación se
+// cancela (no queda una venta "fantasma" sin reflejo real en inventario/deuda).
 export const agregarVenta = async (data) => {
   requireAuth()
   if (!data.clienteId) throw new Error('clienteId requerido')
@@ -320,6 +377,7 @@ export const agregarVenta = async (data) => {
 
   const montoPagado = Number(data.montoPagado) || 0
   const estado      = data.estado || 'pendiente'
+  const items       = (data.items || []).filter(it => it.pId && it.qty)
 
   // Determinar tenantId correcto: si el vendedor pertenece a una empresa,
   // usar empresaId del admin para que el admin vea las ventas consolidadas
@@ -334,62 +392,74 @@ export const agregarVenta = async (data) => {
     }
   } catch {}
 
-  const ref = await addDoc(col('ventas'), {
-    clienteId:      data.clienteId,
-    items:          data.items       || [],
-    subtotal:       Number(data.subtotal || data.total),
-    descuento:      Number(data.descuento)  || 0,   // porcentaje
-    descValor:      Number(data.descValor)  || 0,   // monto descontado
-    total:          Number(data.total),
-    montoPagado:    montoPagado,
-    metodoPago:     data.metodoPago  || 'efectivo',
-    estado,
-    notas:          data.notas       || '',
-    vendedorNombre: data.vendedorNombre || '',
-    vendedorId:     uid(),
-    tenantId,
-    fecha:          serverTimestamp(),
-    creadoEn:       serverTimestamp(),
-  })
+  const ventaId = doc(col('ventas')).id
+  const ventaRef = docRef('ventas', ventaId)
 
-  // Ops secundarias — fallan silenciosamente para no cancelar la venta ya creada
+  await runTransaction(db, async (tx) => {
+    // 1) Leer stock actual de todos los productos involucrados (dentro de la tx)
+    const productSnaps = []
+    for (const item of items) {
+      const pRef  = docRef('productos', item.pId)
+      const pSnap = await tx.get(pRef)
+      if (!pSnap.exists()) throw new Error(`Producto ${item.pId} no existe`)
+      const stockActual = Number(pSnap.data().stock) || 0
+      const qty = Math.abs(Number(item.qty))
+      if (stockActual < qty) {
+        throw new Error(
+          `Stock insuficiente para "${pSnap.data().nombre || item.pId}" ` +
+          `(disponible: ${stockActual}, solicitado: ${qty})`
+        )
+      }
+      productSnaps.push({ ref: pRef, qty })
+    }
 
-  // Actualizar última visita del cliente
-  try {
-    await actualizarCliente(data.clienteId, { ultimaVisita: serverTimestamp() })
-  } catch (err) {
-    console.warn('agregarVenta: no se pudo actualizar ultimaVisita:', err)
-  }
+    // 2) Leer cliente para validar que existe
+    const clienteRef  = docRef('clientes', data.clienteId)
+    const clienteSnap = await tx.get(clienteRef)
+    if (!clienteSnap.exists()) throw new Error('Cliente no encontrado')
 
-  // Descontar stock de cada producto vendido — ATÓMICO con increment()
-  for (const item of (data.items || [])) {
-    if (!item.pId || !item.qty) continue
-    try {
-      await updateDoc(docRef('productos', item.pId), {
-        stock:         increment(-Math.abs(Number(item.qty))),
+    // 3) Crear la venta
+    tx.set(ventaRef, {
+      clienteId:      data.clienteId,
+      items:          data.items       || [],
+      subtotal:       Number(data.subtotal || data.total),
+      descuento:      Number(data.descuento)  || 0,   // porcentaje
+      descValor:      Number(data.descValor)  || 0,   // monto descontado
+      total:          Number(data.total),
+      montoPagado:    montoPagado,
+      metodoPago:     data.metodoPago  || 'efectivo',
+      estado,
+      notas:          data.notas       || '',
+      vendedorNombre: data.vendedorNombre || '',
+      vendedorId:     uid(),
+      tenantId,
+      fecha:          serverTimestamp(),
+      creadoEn:       serverTimestamp(),
+    })
+
+    // 4) Descontar stock — atómico, garantizado >= 0 por la verificación previa
+    for (const { ref, qty } of productSnaps) {
+      tx.update(ref, {
+        stock:         increment(-qty),
         actualizadoEn: serverTimestamp(),
       })
-    } catch (err) {
-      console.warn(`agregarVenta: no se pudo descontar stock de ${item.pId}:`, err)
     }
-  }
 
-  // Agregar a deuda el monto que quedó sin pagar
-  if (estado === 'pendiente' || estado === 'parcial') {
-    try {
+    // 5) Actualizar última visita del cliente y, si quedó saldo pendiente,
+    //    incrementar su deuda — en UNA sola escritura combinada (evita que
+    //    dos tx.update() al mismo doc se sobreescriban entre sí)
+    const clienteUpdate = { ultimaVisita: serverTimestamp() }
+    if (estado === 'pendiente' || estado === 'parcial') {
       const montoADeuda = Math.max(0, Number(data.total) - montoPagado)
       if (montoADeuda > 0) {
-        await updateDoc(docRef('clientes', data.clienteId), {
-          deuda:         increment(montoADeuda),
-          actualizadoEn: serverTimestamp(),
-        })
+        clienteUpdate.deuda         = increment(montoADeuda)
+        clienteUpdate.actualizadoEn = serverTimestamp()
       }
-    } catch (err) {
-      console.warn('agregarVenta: no se pudo actualizar deuda:', err)
     }
-  }
+    tx.update(clienteRef, clienteUpdate)
+  })
 
-  return ref
+  return ventaRef
 }
 
 export const obtenerVentas = async () => {
@@ -471,7 +541,7 @@ export const agregarRuta = async (data) => {
 
 export const obtenerRutas = async () => {
   requireAuth()
-  const q    = query(col('rutas'), where('vendedorId', '==', uid()))
+  const q    = query(col('rutas'), where('vendedorId', '==', uid()), limit(500))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
@@ -522,32 +592,45 @@ export const obtenerVisitasPorVendedor = async (vendedorId) => {
 }
 
 // ── COBROS / PAGOS ────────────────────────────────────
+// registrarPago es ATÓMICO: la lectura de la deuda real, el descuento de la
+// deuda del cliente y la creación del registro de pago ocurren todos dentro
+// de una sola transacción — evita que dos pagos simultáneos al mismo cliente
+// se pisen entre sí (cada uno lee el valor más reciente antes de escribir).
 export const registrarPago = async (clienteId, montoPagado, deudaActual, metodoPago = 'efectivo', referencia = '') => {
   requireAuth()
-  if (!clienteId)                          throw new Error('clienteId requerido')
-  if (montoPagado <= 0)                    throw new Error('Monto debe ser mayor a 0')
-  // SECURITY: verificar contra el valor real en Firestore, no el que envía el cliente
-  const clienteSnap = await getDoc(docRef('clientes', clienteId))
-  if (!clienteSnap.exists())               throw new Error('Cliente no encontrado')
-  const deudaReal = Number(clienteSnap.data().deuda) || 0
-  if (Number(montoPagado) > deudaReal + 0.01) // +0.01 por tolerancia de punto flotante
-    throw new Error(`Monto (${montoPagado}) supera la deuda real (${deudaReal})`)
+  if (!clienteId)       throw new Error('clienteId requerido')
+  if (montoPagado <= 0) throw new Error('Monto debe ser mayor a 0')
 
-  const nuevaDeuda = Math.max(0, deudaReal - Number(montoPagado))
+  const clienteRef = docRef('clientes', clienteId)
+  const pagoRef     = doc(col('pagos'))
 
-  await actualizarCliente(clienteId, { deuda: nuevaDeuda })
+  const nuevaDeuda = await runTransaction(db, async (tx) => {
+    // Leer la deuda real DENTRO de la transacción (no antes) para que dos
+    // pagos concurrentes se serialicen en vez de pisarse.
+    const clienteSnap = await tx.get(clienteRef)
+    if (!clienteSnap.exists()) throw new Error('Cliente no encontrado')
+    const deudaReal = Number(clienteSnap.data().deuda) || 0
 
-  await addDoc(col('pagos'), {
-    clienteId,
-    monto:        Number(montoPagado),
-    deudaAntes:   deudaReal,
-    deudaDespues: nuevaDeuda,
-    metodoPago,
-    referencia,
-    vendedorId:   uid(),
-    tenantId:     uid(),
-    fecha:        serverTimestamp(),
-    creadoEn:     serverTimestamp(),
+    if (Number(montoPagado) > deudaReal + 0.01) // +0.01 tolerancia de punto flotante
+      throw new Error(`Monto (${montoPagado}) supera la deuda real (${deudaReal})`)
+
+    const nueva = Math.max(0, deudaReal - Number(montoPagado))
+
+    tx.update(clienteRef, { deuda: nueva, actualizadoEn: serverTimestamp() })
+    tx.set(pagoRef, {
+      clienteId,
+      monto:        Number(montoPagado),
+      deudaAntes:   deudaReal,
+      deudaDespues: nueva,
+      metodoPago,
+      referencia,
+      vendedorId:   uid(),
+      tenantId:     uid(),
+      fecha:        serverTimestamp(),
+      creadoEn:     serverTimestamp(),
+    })
+
+    return nueva
   })
 
   return nuevaDeuda
@@ -684,6 +767,13 @@ export const suscribirProductos = (tenantId, callback) => {
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.activo !== false))
   }, err => console.error('suscribirProductos:', err))
+}
+
+export const suscribirVisitas = (vendedorId, callback) => {
+  const q = query(col('visitas'), where('vendedorId', '==', vendedorId), limit(500))
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  }, err => console.error('suscribirVisitas:', err))
 }
 
 export const suscribirUsuario = (uid, callback) => {
