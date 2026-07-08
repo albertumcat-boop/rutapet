@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { C } from '../../constants/colors'
 import { useConfig } from '../../context/ConfigContext'
+import { useToast } from '../../context/ToastContext'
 import { agregarCliente } from '../../services/firestore'
 import Icon from '../shared/Icon'
 import Card from '../shared/Card'
@@ -28,6 +29,7 @@ function comprimirImagen(file, maxWidth = 800, calidad = 0.7) {
 
 export default function AddClientScreen({ onBack }) {
   const { config } = useConfig()
+  const toast = useToast()
   const TIPOS = config.tiposCliente || []
 
   const [form, setForm] = useState({
@@ -67,7 +69,7 @@ export default function AddClientScreen({ onBack }) {
       const comprimidoKB = Math.round((base64.length * 0.75) / 1024)
       setFoto(base64)
       setFotoSize({ original: originalKB, comprimido: comprimidoKB })
-    } catch { alert('Error al procesar la imagen') }
+    } catch { toast.error('Error al procesar la imagen') }
     finally { setComprimiendo(false) }
   }
 
@@ -143,7 +145,7 @@ export default function AddClientScreen({ onBack }) {
 
   // ── GUARDAR EN FIREBASE ──────────────────────────
   const handleGuardar = async () => {
-    if (!form.nombre) { alert('El nombre es obligatorio'); return }
+    if (!form.nombre) { toast.warning('El nombre es obligatorio'); return }
     setSaving(true)
     try {
       await agregarCliente({
@@ -165,7 +167,7 @@ export default function AddClientScreen({ onBack }) {
       setDone(true)
       setTimeout(onBack, 1600)
     } catch (err) {
-      alert('Error al guardar: ' + err.message)
+      toast.error('Error al guardar: ' + err.message)
       setSaving(false)
     }
   }

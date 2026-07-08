@@ -91,6 +91,8 @@ export default function AddSaleScreen({ onBack, initCId }) {
     if (!cId)                       return setError('Selecciona un cliente')
     if (itemsValidos.length === 0)  return setError('Agrega al menos un producto válido')
     if (total <= 0)                 return setError('El total debe ser mayor a $0')
+    if (estado === 'parcial' && !(parseFloat(montoPagado) > 0))
+      return setError('Ingresa el monto del abono parcial')
 
     setSaving(true)
     try {

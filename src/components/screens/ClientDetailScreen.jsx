@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { C, nivelBg, nivelTxt, estadoPagoInfo, metodoPagoLabel } from '../../constants/colors'
 import { useAppData } from '../../hooks/useAppData'
 import { useConfig } from '../../context/ConfigContext'
+import { useToast } from '../../context/ToastContext'
 import { actualizarCliente, eliminarCliente, marcarVentaPagada, setInventarioProducto, calcularPorcentajeInventario, colorPorcentaje, labelPorcentaje } from '../../services/firestore'
 import { fmtUSD, daysSince, fmtFecha } from '../../utils/helpers'
 import { imprimirRemision } from '../../utils/pdfPrint'
@@ -14,6 +15,7 @@ import TopBar from '../shared/TopBar'
 export default function ClientDetailScreen({ cliente, onBack, nav }) {
   const { clientes, ventas, visitas, productos, inventario, recargar } = useAppData()
   const { config } = useConfig()
+  const toast = useToast()
 
   const [tab,      setTab]      = useState('info')
   const [editMode, setEditMode] = useState(false)
@@ -84,7 +86,7 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
       recargar()
       setEditMode(false)
     } catch (err) {
-      alert('Error: ' + err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
@@ -101,7 +103,7 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
       await marcarVentaPagada(venta.id, c.id)
       recargar()
     } catch (err) {
-      alert('Error: ' + err.message)
+      toast.error(err.message)
     } finally {
       setMarkingPaid(null)
     }
@@ -115,7 +117,7 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
       setDeleted(true)
       setTimeout(onBack, 500)
     } catch (err) {
-      alert('Error: ' + err.message)
+      toast.error(err.message)
     }
   }
 
@@ -130,7 +132,7 @@ export default function ClientDetailScreen({ cliente, onBack, nav }) {
       recargar()
       setEditInv(false)
     } catch (err) {
-      alert('Error: ' + err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }

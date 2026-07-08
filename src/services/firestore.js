@@ -20,6 +20,24 @@ const requireAuth = () => {
   if (!uid()) throw new Error('Usuario no autenticado')
 }
 
+// Resuelve el tenantId correcto para escrituras:
+// - Admin/solo: uid propio
+// - Vendedor de empresa: empresaId del admin (para que el admin vea sus datos)
+// Si la lectura de /usuarios falla (red), registra el error y usa uid() como fallback
+// en lugar de silenciar el problema con catch{}.
+const getTenantId = async () => {
+  try {
+    const userSnap = await getDoc(docRef('usuarios', uid()))
+    if (userSnap.exists()) {
+      const d = userSnap.data()
+      if (d.rol === 'vendedor' && d.empresaId) return d.empresaId
+    }
+  } catch (e) {
+    console.warn('getTenantId: no se pudo leer userData, usando uid como tenantId', e)
+  }
+  return uid()
+}
+
 // ── USUARIO ───────────────────────────────────────────
 export const obtenerUsuario = async () => {
   if (!uid()) return null
@@ -259,17 +277,7 @@ export const eliminarCliente = async (id) => {
 // ── PRODUCTOS (con campos de medicamentos) ─────────────
 export const agregarProducto = async (data) => {
   requireAuth()
-  // Usar el tenantId del admin si es vendedor
-  let tenantId = uid()
-  try {
-    const userSnap = await getDoc(docRef('usuarios', uid()))
-    if (userSnap.exists()) {
-      const userData = userSnap.data()
-      if (userData.rol === 'vendedor' && userData.empresaId) {
-        tenantId = userData.empresaId
-      }
-    }
-  } catch {}
+  const tenantId = await getTenantId()
 
   return await addDoc(col('productos'), {
     // Campos base
@@ -302,17 +310,7 @@ export const agregarProducto = async (data) => {
 
 export const obtenerProductos = async () => {
   requireAuth()
-  // Si el usuario es vendedor de una empresa, usa el tenantId del admin (empresaId)
-  let tenantId = uid()
-  try {
-    const userSnap = await getDoc(docRef('usuarios', uid()))
-    if (userSnap.exists()) {
-      const userData = userSnap.data()
-      if (userData.rol === 'vendedor' && userData.empresaId) {
-        tenantId = userData.empresaId
-      }
-    }
-  } catch {}
+  const tenantId = await getTenantId()
 
   const q    = query(col('productos'), where('tenantId', '==', tenantId))
   const snap = await getDocs(q)
@@ -324,9 +322,11 @@ export const obtenerProductos = async () => {
 export const actualizarProducto = async (id, data) => {
   requireAuth()
   if (!id) throw new Error('ID de producto requerido')
-  // SECURITY: whitelist — evita sobreescribir tenantId u otros campos de sistema
+  // SECURITY: whitelist — 'stock' excluido intencionalmente: el stock real
+  // lo mantiene agregarVenta con increment(). El admin puede ver el stock
+  // pero no sobreescribirlo desde el formulario de edición.
   const permitidos = [
-    'nombre','categoria','marca','precio','stock','stockMinimo','descripcion',
+    'nombre','categoria','marca','precio','stockMinimo','descripcion',
     'principioActivo','concentracion','presentacion','unidad','lote',
     'fechaVencimiento','registroSanitario','cadenaFrio','requiereReceta',
     'esMedicamento','precios','activo',
@@ -379,19 +379,7 @@ export const agregarVenta = async (data) => {
   const estado      = data.estado || 'pendiente'
   const items       = (data.items || []).filter(it => it.pId && it.qty)
 
-  // Determinar tenantId correcto: si el vendedor pertenece a una empresa,
-  // usar empresaId del admin para que el admin vea las ventas consolidadas
-  let tenantId = uid()
-  try {
-    const userSnap = await getDoc(docRef('usuarios', uid()))
-    if (userSnap.exists()) {
-      const userData = userSnap.data()
-      if (userData.rol === 'vendedor' && userData.empresaId) {
-        tenantId = userData.empresaId
-      }
-    }
-  } catch {}
-
+  const tenantId = await getTenantId()
   const ventaId = doc(col('ventas')).id
   const ventaRef = docRef('ventas', ventaId)
 
@@ -480,7 +468,11 @@ export const obtenerVentasEmpresa = async (empresaId) => {
 export const actualizarVenta = async (id, data) => {
   requireAuth()
   if (!id) throw new Error('ID de venta requerido')
-  // SECURITY: whitelist de campos editables — no se permite cambiar total ni IDs
+  // SECURITY: si se intenta marcar como pagado, usar marcarVentaPagada() en su lugar
+  // para que la deuda del cliente se reduzca atómicamente.
+  if (data.estado === 'pagado') {
+    throw new Error('Para marcar una venta como pagada usa marcarVentaPagada() — actualiza la deuda del cliente en la misma transacción.')
+  }
   const permitidos = ['estado', 'montoPagado', 'notas', 'metodoPago', 'referencia']
   const update = {}
   for (const key of permitidos) {
@@ -495,14 +487,15 @@ export const actualizarVenta = async (id, data) => {
 export const agregarVisita = async (data) => {
   requireAuth()
   if (!data.clienteId) throw new Error('clienteId requerido')
+  const tenantId = await getTenantId()
 
   const ref = await addDoc(col('visitas'), {
     clienteId:  data.clienteId,
     vendio:     data.vendio !== undefined ? data.vendio : false,
     notas:      data.notas      || '',
-    firma:      data.firma      || null,   // base64 PNG de firma digital
+    firma:      data.firma      || null,
     vendedorId: uid(),
-    tenantId:   uid(),
+    tenantId,
     fecha:      serverTimestamp(),
     creadoEn:   serverTimestamp(),
   })
@@ -525,6 +518,8 @@ export const obtenerVisitas = async () => {
 export const agregarRuta = async (data) => {
   requireAuth()
   if (!data.nombre) throw new Error('Nombre de ruta requerido')
+  if ((data.clientes?.length || 0) > 200) throw new Error('Límite de 200 clientes por ruta')
+  const tenantId = await getTenantId()
 
   return await addDoc(col('rutas'), {
     nombre:    data.nombre,
@@ -534,7 +529,7 @@ export const agregarRuta = async (data) => {
     km:        Number(data.km) || 0,
     notas:     data.notas     || '',
     vendedorId:uid(),
-    tenantId:  uid(),
+    tenantId,
     creadoEn:  serverTimestamp(),
   })
 }
@@ -601,8 +596,9 @@ export const registrarPago = async (clienteId, montoPagado, deudaActual, metodoP
   if (!clienteId)       throw new Error('clienteId requerido')
   if (montoPagado <= 0) throw new Error('Monto debe ser mayor a 0')
 
+  const tenantId   = await getTenantId()
   const clienteRef = docRef('clientes', clienteId)
-  const pagoRef     = doc(col('pagos'))
+  const pagoRef    = doc(col('pagos'))
 
   const nuevaDeuda = await runTransaction(db, async (tx) => {
     // Leer la deuda real DENTRO de la transacción (no antes) para que dos
@@ -625,7 +621,7 @@ export const registrarPago = async (clienteId, montoPagado, deudaActual, metodoP
       metodoPago,
       referencia,
       vendedorId:   uid(),
-      tenantId:     uid(),
+      tenantId,
       fecha:        serverTimestamp(),
       creadoEn:     serverTimestamp(),
     })

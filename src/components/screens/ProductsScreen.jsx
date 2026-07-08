@@ -118,7 +118,10 @@ export default function ProductsScreen({ onBack, nav }) {
         categoria:        form.categoria || config.categoriasProducto[0]?.key || '',
         marca:            form.marca.trim(),
         precio:           parseFloat(form.precio),
-        stock:            parseInt(form.stock)     || 0,
+        // 'stock' solo se incluye al crear — al editar se omite intencionalmente
+        // para no pisar el contador real que mantiene agregarVenta con increment().
+        // Para ajustar stock existente se debe usar un flujo de ajuste dedicado.
+        ...(!editId && { stock: parseInt(form.stock) || 0 }),
         stockMinimo:      parseInt(form.stockMinimo) || 0,
         descripcion:      form.descripcion.trim(),
         principioActivo:  form.principioActivo.trim(),
@@ -494,10 +497,20 @@ export default function ProductsScreen({ onBack, nav }) {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 4 }}>Stock inicial</label>
-                      <input type="number" min="0" value={form.stock} onChange={e => upd('stock', e.target.value)}
-                        placeholder="0"
-                        style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                      <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 4 }}>
+                        {editId ? 'Stock actual' : 'Stock inicial'}
+                      </label>
+                      {editId ? (
+                        // Al editar: mostrar stock como read-only para no pisar
+                        // el contador que mantienen las ventas (agregarVenta usa increment)
+                        <div style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, boxSizing: 'border-box', background: C.gray50, color: C.gray400 }}>
+                          {form.stock || 0} <span style={{ fontSize: 11 }}>(solo ventas lo modifican)</span>
+                        </div>
+                      ) : (
+                        <input type="number" min="0" value={form.stock} onChange={e => upd('stock', e.target.value)}
+                          placeholder="0"
+                          style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                      )}
                     </div>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 700, color: C.gray600, display: 'block', marginBottom: 4 }}>Stock mínimo</label>

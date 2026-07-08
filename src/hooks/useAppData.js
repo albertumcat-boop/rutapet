@@ -175,20 +175,42 @@ export function useAppData() {
   }, [merge])
 
   const recargar = useCallback(async () => {
-    // Con onSnapshot los datos ya se actualizan solos.
-    // Esta función refresca las colecciones one-time (rutas, inventario, equipo).
+    // Refresca colecciones one-time: rutas, inventario y datos de equipo (admin).
     const user = auth.currentUser
     if (!user) return
     try {
-      const [rutas, inventario] = await Promise.all([
+      const [rutas, inventario, userData] = await Promise.all([
         obtenerRutas(),
         obtenerTodoInventario(),
+        obtenerUsuario(),
       ])
-      if (mountedRef.current) setData(prev => ({ ...prev, rutas, inventario }))
+      if (!mountedRef.current) return
+      setData(prev => ({ ...prev, rutas, inventario }))
+
+      if (userData?.rol === 'admin') {
+        const empresaId = userData.empresaId || user.uid
+        const equipo    = await obtenerMiembrosEquipo(empresaId)
+        const vendedores = equipo.filter(m => m.id !== user.uid && m.rol === 'vendedor')
+        if (!mountedRef.current) return
+        setData(prev => ({ ...prev, equipo }))
+        if (vendedores.length > 0) {
+          const resultados = await Promise.all(
+            vendedores.map(async v => ({
+              clientes: await obtenerClientesPorVendedor(v.id),
+              ventas:   await obtenerVentasPorVendedor(v.id),
+              visitas:  await obtenerVisitasPorVendedor(v.id),
+            }))
+          )
+          equipoRef.current.clientes = uniq(resultados.flatMap(r => r.clientes))
+          equipoRef.current.ventas   = uniq(resultados.flatMap(r => r.ventas))
+          equipoRef.current.visitas  = uniq(resultados.flatMap(r => r.visitas))
+          if (mountedRef.current) merge()
+        }
+      }
     } catch (err) {
       console.warn('recargar:', err)
     }
-  }, [])
+  }, [merge])
 
   return { ...data, loading, error, recargar }
 }
